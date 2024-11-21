@@ -1,3 +1,6 @@
+[![Python](https://img.shields.io/badge/Python-v3.9.18-blue)](https://www.python.org/downloads/release/python-3918/)
+[![RNAfold](https://img.shields.io/badge/RNAfold-v2.5.0-purple)](http://rna.tbi.univie.ac.at/cgi-bin/RNAWebSuite/RNAfold.cgi)
+
 # Inverted Alus
 This code accompanies our submitted manuscript: "Inverted Alu repeats in loop-out exon skipping across hominoid evolution".
 
