@@ -1,0 +1,42 @@
+Project Documentation
+
+Prerequisite Software
+
+Ensure the following tools are installed and added to your system’s PATH:
+
+	•	SRATOOLKIT
+	•	SAMTOOLS
+	•	BEDTOOLS
+
+1. Generate Randomized Genic Regions and Count Flanking IRAlus
+
+This step creates randomized genic regions and counts how many are flanked by IRAlus within specified window sizes.
+
+Instructions:
+	1.	Set the desired window size
+    Open the 1_R/1_generate_and_count_randomized_genic_region.sh file and set the window_size variable to one of the following values: 1000, 2000, or 5000.
+
+	2.	Run the script
+    Execute the script by running:
+    source 1_generate_and_count_randomized_genic_region.sh
+        •	This will generate temporary count files (e.g., result_{i}.csv).
+        •	For parallelization, you can modify this script to suit your computational environment.
+    
+    3.	Merge temporary files
+    Combine the generated result_{i}.csv files into a single file by running:
+    source 2_concat_and_remove_temp_files.sh
+        •	The script will produce result.csv, which contains data for 10,000 replicates of randomized genic regions flanked by IRAlus within the specified window sizes.
+        •	Output file structure:
+    The result file contains four columns representing:
+        1.	Number of regions flanked by two any Alus.
+        2.	Number of regions flanked by two non-hominoid-specific Alus.
+        3.	Number of regions flanked by one hominoid-specific Alu and one non-hominoid-specific Alu.
+        4.	Number of regions flanked by two hominoid-specific Alus.
+
+2. Analysis and Visualization
+
+Instructions:
+	1.	Open and follow the Jupyter Notebook for figure generation:
+    2_iPython/graph_visualization.ipynb
+    
+    2.	Use this notebook to visualize and analyze the results.
