@@ -2,7 +2,9 @@
 [![RNAfold](https://img.shields.io/badge/RNAfold-v2.5.0-purple)](http://rna.tbi.univie.ac.at/cgi-bin/RNAWebSuite/RNAfold.cgi)
 
 # Inverted Alus
-This code accompanies our submitted manuscript: "Inverted Alu repeats in loop-out exon skipping across hominoid evolution".
+This code accompanies our submitted manuscript: "Inverted Alu repeats in loop-out exon skipping across hominoid evolution" (PMID: [40161837](https://pubmed.ncbi.nlm.nih.gov/40161837/)).
+
+We provide supporting Jupyter notebooks to generate figures presented in the manuscript, as well as our environment files under `envs`.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC_BY--NC_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
