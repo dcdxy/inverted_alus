@@ -7,12 +7,25 @@ from statsmodels.stats.multitest import multipletests
 import numpy as np
 import zepid
 import matplotlib as mpl
+from pybedtools import BedTool
+from Bio.SeqUtils import gc_fraction
 
 
 def add_label_col(df, label_col):
     df = df.copy()
     df["label"] = label_col
     return df
+
+
+def calc_intra_dist(row):
+    if row["exon_strand"] == "+":
+        return -(max(row["upstream_alu_start"], row["upstream_alu_end"]) - 
+                    min(row["downstream_alu_start"], row["downstream_alu_end"]))
+    elif row["exon_strand"] == "-":
+        return -(max(row["downstream_alu_start"], row["downstream_alu_end"]) - 
+                    min(row["upstream_alu_start"], row["upstream_alu_end"]))
+    else:
+        raise ValueError(f"Unexpected strand value: {row['exon_strand']}")
 
 
 def add_alu_len_exon_len_cols(df, pairs):
@@ -23,20 +36,29 @@ def add_alu_len_exon_len_cols(df, pairs):
         df["upstream_alu_len"]  = df["upstream_alu_len"].abs()
         df["downstream_alu_len"]  = df["downstream_alu_end"] - df["downstream_alu_start"]
         df["downstream_alu_len"]  = df["downstream_alu_len"].abs()
-        df["dist1"] = df["downstream_alu_start"] - df["upstream_alu_end"]
-        df["dist2"] = df["upstream_alu_start"] - df["downstream_alu_end"]
-        df["intra_alu_len"] = df[["dist1", "dist2"]].abs().min(axis=1)
-        return df[["upstream_alu_len","downstream_alu_len","exon_len","intra_alu_len","dist1","dist2"]]
+        #df["dist1"] = df["downstream_alu_start"] - df["upstream_alu_end"]
+        #df["dist2"] = df["upstream_alu_start"] - df["downstream_alu_end"]
+        #df["intra_alu_len"] = df[["dist1", "dist2"]].abs().min(axis=1)
+        df["intra_alu_len"] = df.apply(calc_intra_dist, axis=1) # XXX updated on 08-01-2025
+        assert (df["intra_alu_len"].dropna() > 0).all(), "Some intra_alu_len values are not positive!"
+        df["dist1"] = 0 #XXX remove dist1 and dist2 unless needed later
+        df["dist2"] = 0
+        return df[["upstream_alu_len", "downstream_alu_len", "exon_len",
+                   "intra_alu_len", "dist1", "dist2"]]
     elif not pairs:
         df["alu_len"] = df["alu_end"] - df["alu_start"]
         df["alu_len"] = df["alu_len"].abs()
-        return df[["alu_len","exon_len"]]
+        return df[["alu_len", "exon_len"]]
 
 
 def generate_pairgrid_plot(df, cols, nrows_sample, window_size, title, inversion):
     #pairgrid_pair_cols = ["upstream_alu_len", "downstream_alu_len", "exon_len", 
     #                      "upstream_dist", "downstream_dist", "label"]
     pairgrid_pair_cols = cols
+    
+    # XXX new
+    df = df.copy()
+    df[["upstream_dist", "downstream_dist"]] = df[["upstream_dist", "downstream_dist"]].abs()
     
     column_labels = {
         'upstream_alu_len': "Upstream Alu\nLength",
@@ -198,15 +220,20 @@ def jitter(values, j):
     return values + np.random.normal(j,0.1,values.shape)
 
 def run_ks_2sample_test_2sided(df1, df2, col):
-    return ks_2samp(df1[col], df2[col], alternative="two-sided", method="auto")
+    """Updated to "mask" NaN values by using nan_policy="omit". That way we don't have to filter out exons completely.
+    """
+    return ks_2samp(df1[col], df2[col], alternative="two-sided", method="auto", nan_policy="omit")  # XXX updated to use nan_policy="omit" on 08/07/25 to handle NaN values
 
 def run_ks_test(df1, df2_inverted, df3_noninverted, cv=0, n_sample=0):
     """
     cv=10
     n_sample=1000
     """
-    pairgrid_pair_cols = ["upstream_alu_len", "downstream_alu_len", "exon_len", 
-                          "upstream_dist", "downstream_dist", "intra_alu_len"]
+    pairgrid_pair_cols = ["upstream_alu_len", "downstream_alu_len", "exon_len",  
+                          "upstream_dist", "downstream_dist", "intra_alu_len",  # XXX how are upstream_dist and downstream_dist computed?
+                          "upstream_intron_length", "downstream_intron_length", 
+                          "alu_span_GC_content", "intron_span_GC_content", 
+                          "up_alu_count", "down_alu_count"]  # XXX new from 08-01-2025
     fixed_categories = ["skippable", "constitutive", "inverted", "noninverted", "all"]
     
     if cv > 0:
@@ -217,18 +244,18 @@ def run_ks_test(df1, df2_inverted, df3_noninverted, cv=0, n_sample=0):
                 ks_dct[col][category] = {"pval": [], "stat": []}
         
         for i in range(cv):
-            df1_skippable = df1[df1["label"] == "skippable"].sample(n=n_sample, random_state=i)
-            df1_constitutive = df1[df1["label"] == "constitutive"].sample(n=n_sample, random_state=i)
-            df2_inverted_skippable = df2_inverted[df2_inverted["label"] == "skippable_inverted"].sample(n=n_sample, random_state=i)
-            df2_inverted_constitutive = df2_inverted[df2_inverted["label"] == "constitutive_inverted"].sample(n=n_sample, random_state=i)
-            df3_noninverted_skippable = df3_noninverted[df3_noninverted["label"] == "skippable_noninverted"].sample(n=n_sample, random_state=i) # new
+            df1_skippable                = df1[df1["label"] == "skippable"].sample(n=n_sample, random_state=i)
+            df1_constitutive             = df1[df1["label"] == "constitutive"].sample(n=n_sample, random_state=i)
+            df2_inverted_skippable       = df2_inverted[df2_inverted["label"] == "skippable_inverted"].sample(n=n_sample, random_state=i)
+            df2_inverted_constitutive    = df2_inverted[df2_inverted["label"] == "constitutive_inverted"].sample(n=n_sample, random_state=i)
+            df3_noninverted_skippable    = df3_noninverted[df3_noninverted["label"] == "skippable_noninverted"].sample(n=n_sample, random_state=i) # new
             df3_noninverted_constitutive = df3_noninverted[df3_noninverted["label"] == "constitutive_noninverted"].sample(n=n_sample, random_state=i) # new
     
             for col in pairgrid_pair_cols:
                 ks_res_skip = (
                     run_ks_2sample_test_2sided(df1=df1_skippable,
                                                df2=df2_inverted_skippable,
-                                               col=col)
+                                               col=col)  # XXX mask here
                 )
                 ks_res_cons = (
                     run_ks_2sample_test_2sided(df1=df1_constitutive,
@@ -384,35 +411,31 @@ def run_ks_test(df1, df2_inverted, df3_noninverted, cv=0, n_sample=0):
     return ks_dct
 
 
-def plot_exon_length(alu_dct, window, exon_distance=False, zoom=False, show_title=True, inv=None, ax=None, show_legend=True):
-    skippable_pairs_df = add_label_col(
-        alu_dct["skippable"], "skippable")
-    constitutive_pairs_df = add_label_col(
-        alu_dct["constitutive"], "constitutive")
-    skippable_inverted_pairs_df = add_label_col(
-        alu_dct["skippable_inverted"], "skippable_inverted")
-    constitutive_inverted_pairs_df = add_label_col(
-        alu_dct["constitutive_inverted"], "constitutive_inverted")
-    skippable_noninverted_pairs_df = add_label_col(
-        alu_dct["skippable_noninverted"], "skippable_noninverted")
-    constitutive_noninverted_pairs_df = add_label_col(
-        alu_dct["constitutive_noninverted"], "constitutive_noninverted")
+def plot_exon_length(alu_dct, window, exon_distance=False, y_col="exon_len", zoom=False, show_title=True, inv=None, ax=None, show_legend=True, plot_type="violin"):
+    skippable_pairs_df                = add_label_col(alu_dct["skippable"], "skippable")
+    constitutive_pairs_df             = add_label_col(alu_dct["constitutive"], "constitutive")
+    skippable_inverted_pairs_df       = add_label_col(alu_dct["skippable_inverted"], "skippable_inverted")
+    constitutive_inverted_pairs_df    = add_label_col(alu_dct["constitutive_inverted"], "constitutive_inverted")
+    skippable_noninverted_pairs_df    = add_label_col(alu_dct["skippable_noninverted"], "skippable_noninverted")
+    constitutive_noninverted_pairs_df = add_label_col(alu_dct["constitutive_noninverted"], "constitutive_noninverted")
 
-    concat_pairs_df = pd.concat([skippable_pairs_df, constitutive_pairs_df])
-    concat_inverted_pairs_df = pd.concat([skippable_inverted_pairs_df, constitutive_inverted_pairs_df])
+    concat_pairs_df             = pd.concat([skippable_pairs_df, constitutive_pairs_df])
+    concat_inverted_pairs_df    = pd.concat([skippable_inverted_pairs_df, constitutive_inverted_pairs_df])
     concat_noninverted_pairs_df = pd.concat([skippable_noninverted_pairs_df, constitutive_noninverted_pairs_df])
     
-    concat_pairs_df[["upstream_alu_len", "downstream_alu_len", "exon_len", 
-                     "intra_alu_len","alu1_end_to_alu2_start", "alu2_end_to_alu1_start"]] = (
-       add_alu_len_exon_len_cols(concat_pairs_df, pairs=True))
-    concat_inverted_pairs_df[["upstream_alu_len", "downstream_alu_len", "exon_len", 
-                              "intra_alu_len", "alu1_end_to_alu2_start", "alu2_end_to_alu1_start"]] = (
-       add_alu_len_exon_len_cols(concat_inverted_pairs_df, pairs=True))
-    concat_noninverted_pairs_df[["upstream_alu_len", "downstream_alu_len", "exon_len",
-                                 "intra_alu_len", "alu1_end_to_alu2_start", "alu2_end_to_alu1_start"]] = (
-       add_alu_len_exon_len_cols(concat_noninverted_pairs_df, pairs=True))
+    concat_pairs_df[
+        ["upstream_alu_len", "downstream_alu_len", "exon_len",
+         "intra_alu_len","alu1_end_to_alu2_start", "alu2_end_to_alu1_start"]
+        ] = (add_alu_len_exon_len_cols(concat_pairs_df, pairs=True))
+    concat_inverted_pairs_df[
+        ["upstream_alu_len", "downstream_alu_len", "exon_len",
+         "intra_alu_len", "alu1_end_to_alu2_start", "alu2_end_to_alu1_start"]
+        ] = (add_alu_len_exon_len_cols(concat_inverted_pairs_df, pairs=True))
+    concat_noninverted_pairs_df[
+        ["upstream_alu_len", "downstream_alu_len", "exon_len",
+         "intra_alu_len", "alu1_end_to_alu2_start", "alu2_end_to_alu1_start"]
+        ] = (add_alu_len_exon_len_cols(concat_noninverted_pairs_df, pairs=True))
     
-        
     #subset_df = df[df['type'].isin(['skippable', 'const'])]
     # generate_violin_plot(df=concat_pairs_df[concat_pairs_df["label"].isin(["skippable", "constitutive"])], 
     #                      window_size=window, title="All", fill_colour="lightgrey")
@@ -420,6 +443,7 @@ def plot_exon_length(alu_dct, window, exon_distance=False, zoom=False, show_titl
     #                      window_size=window, title="Inverted", fill_colour="steelblue")
     # generate_violin_plot(df=concat_noninverted_pairs_df, #[concat_pairs_df["label"].isin(["skippable_noninverted", "constitutive_noninverted"])], 
     #                      window_size=window, title="Non-inverted", fill_colour="orange")
+    
     if not exon_distance:
         generate_violin_plot_multi(
             df_all=concat_pairs_df[concat_pairs_df["label"].isin(["skippable", "constitutive"])],
@@ -427,7 +451,9 @@ def plot_exon_length(alu_dct, window, exon_distance=False, zoom=False, show_titl
             df_noninv=concat_noninverted_pairs_df, #[concat_pairs_df["label"].isin(["skippable_noninverted", "constitutive_noninverted"])], 
             window_size=window, 
             title="",
+            y_col=y_col,
             show_legend=show_legend,
+            plot_type=plot_type,
             ax=ax)
     
     if exon_distance:
@@ -437,7 +463,7 @@ def plot_exon_length(alu_dct, window, exon_distance=False, zoom=False, show_titl
             generate_histogram_multi(df=concat_inverted_pairs_df, #[concat_pairs_df["label"].isin(["skippable_inverted", "constitutive_inverted"])], 
                                      window_size=window, title="Inverted", 
                                      legend=False, ylabel=True, ax=ax, zoom=zoom, show_title=show_title)
-        elif inv == "inverted" and show_title == False:
+        elif inv == "inverted" and show_title == False: #this one for combined plot
             generate_histogram_multi(df=concat_inverted_pairs_df, #[concat_pairs_df["label"].isin(["skippable_inverted", "constitutive_inverted"])], 
                                      window_size=window, title="Inverted", 
                                      legend=True, ylabel=True, ax=ax, 
@@ -455,7 +481,21 @@ def plot_exon_length(alu_dct, window, exon_distance=False, zoom=False, show_titl
                                      legend_pos="single")
 
 
-def generate_violin_plot_multi(df_all, df_inv, df_noninv, window_size, title, show_legend=True, ax=None):
+def generate_violin_plot_multi(df_all, df_inv, df_noninv, window_size, title, y_col="exon_len", plot_type="violin", show_legend=True, ax=None):
+    """
+    Generate a violin plot for exon lengths across different categories (inverted, non-inverted, and all).
+    Args:
+        df_all (DataFrame): DataFrame containing all pairs.
+        df_inv (DataFrame): DataFrame containing inverted pairs.
+        df_noninv (DataFrame): DataFrame containing non-inverted pairs.
+        window_size (str): Size of the window for the plot.
+        title (str): Title of the plot.
+        y_col (str): Column name for the y-axis values. Default is "exon_len".
+        show_legend (bool): Whether to show the legend. Default is True.
+        ax (Axes): Matplotlib Axes object to draw the plot on. If None, a new figure and axes will be created.
+    Returns:
+        None
+    """
     tick_params_width = 0.25
     tick_params_length = 1
     tick_params_pad = 2
@@ -475,6 +515,7 @@ def generate_violin_plot_multi(df_all, df_inv, df_noninv, window_size, title, sh
     df_noninv["hue_label"] = "Non-inv"
     
     df_plot = pd.concat([df_all, df_inv, df_noninv], axis=0, ignore_index=True)
+    #print(f"df_all: {df_all.shape}, df_inv: {df_inv.shape}, df_noninv: {df_noninv.shape}, df_plot: {df_plot.shape}")
     # Define conditions and corresponding values
     conditions = [
         df_plot['label'].isin(["skippable", "skippable_inverted", "skippable_noninverted"]),
@@ -487,42 +528,144 @@ def generate_violin_plot_multi(df_all, df_inv, df_noninv, window_size, title, sh
         fig, ax = plt.subplots(figsize=(4,6))
 
     fontsize_min = 5
-    #plt.figure(figsize=(4, 6))
-    sns.boxplot(x='hue_label', y='exon_len', data=df_plot, showcaps=False, 
-                #boxprops={'facecolor': fill_colour}, 
-                hue="group", #hue_order and palette
-                order=["Inv", "Non-inv", "Inv and\nNon-inv"],
-                palette=[blue, orange],
-                #linecolor=["#0077BB", "#EE7733"],
-                showfliers=False, 
-                whiskerprops={'linewidth': 0.5},
-                linewidth=0.25, 
-                ax=ax)
-    
-    ax.set_ylim(-20, 350)
-    ax.set_yticks(np.arange(0, 351, 50))
 
-    ax.set_xlabel("") # Window
-    ax.set_ylabel("Exon length (bp)", fontsize=fontsize_min, labelpad=axis_label_pad)
+    if plot_type == "box":
+        # plt.figure(figsize=(4, 6))
+        sns.boxplot(x='hue_label', y=y_col, data=df_plot, showcaps=False, #y='exon_len'
+                    #boxprops={'facecolor': fill_colour}, 
+                    hue="group", #hue_order and palette
+                    order=["Inv", "Non-inv", "Inv and\nNon-inv"],
+                    palette=[blue, orange],
+                    #linecolor=["#0077BB", "#EE7733"],
+                    showfliers=False, 
+                    whiskerprops={'linewidth': 0.5},
+                    linewidth=0.25, 
+                    ax=ax)
+        if y_col == "exon_len":
+            ax.set_ylim(-20, 350)
+            ax.set_yticks(np.arange(0, 351, 50))
+            ax.set_ylabel("Exon length (bp)", fontsize=fontsize_min, labelpad=axis_label_pad)
+        elif y_col == "downstream_intron_length":
+            ax.set_ylim(-20, 15000)
+            ax.set_yticks(np.arange(0, 30001, 2500)) #15001
+            ax.set_ylabel("Downstream \nintron length (bp)", fontsize=fontsize_min, labelpad=axis_label_pad)
+
+    #ax.set_ylim(-20, 350) #XXX for now
+    #ax.set_yticks(np.arange(0, 351, 50))
+    
+    # if y_col == "exon_len":
+    #     cut_lim = 350
+    # elif y_col == "downstream_intron_length":
+    #     cut_lim = 15000
+    # else:
+    #     cut_lim = 1000
+    
+    if plot_type == "violin":
+        df_plot["log_y"] = np.log10(df_plot[y_col] + 1)
+        
+        from scipy.stats import mannwhitneyu
+        for hue_l in df_plot["hue_label"].unique():
+            df_to_compare = df_plot[df_plot["hue_label"] == hue_l]
+            group1 = df_to_compare[df_to_compare["group"] == "Skippable (S)"]["log_y"]
+            group2 = df_to_compare[df_to_compare["group"] == "Constitutive (C)"]["log_y"]
+            n1 = len(group1.dropna())
+            n2 = len(group2.dropna())
+            mannu_result = mannwhitneyu(group1, group2, alternative='less', nan_policy="omit")
+            #if hue_l == "Inv and\nNon-inv":
+            #    print(f"Comparing Skippable vs Constitutive for Inv and Non-inv")
+            #else:
+            #    print(f"Comparing Skippable vs Constitutive for {hue_l}")
+            #print(f"Group 1: {group1.describe()}")
+            #print(f"Group 2: {group2.describe()}")
+            #print(f"Mann-Whitney U test for {hue_l}: {group1.name} vs {group2.name}")
+            #print(f"U-statistic: {mannu_result.statistic}, alt=less p-value: {mannu_result.pvalue}, effect size: {mannu_result.statistic / (n1*n2)}\n")
+
+        sns.violinplot(
+            x='hue_label',
+            y="log_y",  # y=y_col
+            data=df_plot,  # showcaps=False,
+            hue="group",  # hue_order
+            order=["Inv", "Non-inv", "Inv and\nNon-inv"],
+            palette=[blue, orange],
+            linewidth=0.25,
+            gridsize=400,
+            #bw_method=0.2,
+            bw_adjust=1,
+            split=True, #XXX new
+            cut=0,
+            gap=0.2, 
+            # inner="quart",
+            #inner="stick",
+            #log_scale=True,
+            ax=ax
+        )
+        ticks = [1, 10, 100, 1000, 10000, 100000]
+        ax.set_yticks(np.log10(ticks))
+        ax.set_yticklabels([str(t) for t in ticks], fontsize=fontsize_min)
+        #ax.set_ylim(top=np.log10(999999))  # XXX
+        ax.tick_params(axis='y', labelsize=fontsize_min)
+        ax.set_ylabel(y_col, fontsize=fontsize_min)
+
+        if y_col == "exon_len":
+            ax.set_ylabel("log10(Exon length (bp))", fontsize=fontsize_min, labelpad=axis_label_pad)
+            ax.set_ylim(top=4.9)  # 4.5
+        elif y_col == "downstream_intron_length":
+            ax.set_ylabel("log10(Downstream \nintron length (bp))", fontsize=fontsize_min, labelpad=axis_label_pad)
+            ax.set_ylim(bottom=1.5)
+            ax.set_ylim(top=5.9)
+        # log_ticks = np.log10([1, 10, 100, 1000, 10000, 100000])
+        # ax.set_yticks(log_ticks)
+        # ax.set_yticklabels([f"{t:,}" for t in [1, 10, 100, 1000, 10000, 100000]])
+
+    # sns.histplot(
+    #     data=df_plot[df_plot["hue_label"] == "Inv"],
+    #     x=y_col,
+    #     hue="group",
+    #     multiple="dodge",     # bar groups side by side
+    #     bins=30,              # or specify manually
+    #     palette=[blue, orange],
+    #     log_scale=(True, False),  # log scale for x-axis only
+    #     ax=ax
+    # )
+
+    ax.set_xlabel("")  # Window
+    #ax.set_ylabel("Exon length (bp)", fontsize=fontsize_min, labelpad=axis_label_pad)
 
     ax.tick_params(axis='x', rotation=90, labelsize=fontsize_min, 
                    length=tick_params_length, width=tick_params_width, pad=tick_params_pad)
     ax.tick_params(axis='y', labelsize=fontsize_min, 
                    length=tick_params_length, width=tick_params_width, pad=tick_params_pad)
     
-    if show_legend:
-        # ax.legend(title='', loc='upper center', bbox_to_anchor=(0.5, 1.25), 
-        #           ncol=1, fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)
-        ax.legend(title='', loc='lower center', bbox_to_anchor=(0.5, -1.25),
-                  ncol=1, fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)
-    else:
-        ax.get_legend().remove()
+    # if show_legend:
+    #     # ax.legend(title='', loc='upper center', bbox_to_anchor=(0.5, 1.25), 
+    #     #           ncol=1, fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)
+    #     #ax.legend(title='', loc='lower center', bbox_to_anchor=(0.5, -1.25),
+    #     #          ncol=1, fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)  # XXX previous
+    #     handles, labels = ax.get_legend_handles_labels()  # new 2025-08-18
+    #     ax.get_legend().remove()  # new
+    #     return handles, labels
+    # else:
+    #     ax.get_legend().remove()
+    #     return None, None  # new
 
     for spine in ax.spines.values():
         spine.set_linewidth(0.25)
 
-    if not ax:
+    if ax is None:
         plt.show()
+        
+    if show_legend:
+        #print("showing legend")
+        handles, labels = ax.get_legend_handles_labels()  # new 2025-08-18
+        #ax.get_legend().remove()  # new
+        return handles, labels
+    else:
+        #print("not showing legend")
+        legend = ax.get_legend()
+        if legend:
+            legend.remove()
+        return None, None  # new
+    
     #plt.title(f'{title}: {window_size}')
     #plt.xlabel('Category')
     #plt.ylabel('Exon length (bp)')
@@ -583,6 +726,9 @@ def generate_histogram_multi(df, window_size, title, legend, ylabel, ax=None, zo
     ax.tick_params(axis='both', which='both', 
                    length=tick_params_length, width=tick_params_width, pad=tick_params_pad)
 
+    df = df.copy()  # XXX new
+    df["upstream_dist"]   = -df["upstream_dist"].abs()  # Make upstream distances negative
+    df["downstream_dist"] = df["downstream_dist"].abs()  # Ensure downstream distances are positive
     df_melted = pd.melt(df, id_vars=['label'], value_vars=['upstream_dist', 'downstream_dist'], 
                         value_name='distance')
     #print(df_melted.columns)
@@ -653,9 +799,179 @@ def generate_histogram(df, window_size, title):
     #plt.legend(handles=handles, labels=labels, title='Exon group', loc='upper center', bbox_to_anchor=(0.5, -0.1), shadow=True, ncol=2)
     plt.title(f"{title}: {window_size}")
     plt.show()
-    
 
-def run_pairplot_window(alu_dct, window, ks_test=False, cv=0, n_sample=0, inverted=False):
+
+# import pandas as pd
+# import pyranges as pr
+
+# # XXX new
+# def add_intron_lengths_with_pyranges(df, gtf_path, chr_col="exon_chr", start_col="exon_start", end_col="exon_end", strand_col="exon_strand"):
+#     """
+#     Adds upstream and downstream intron lengths to a DataFrame using pyranges and a GTF file.
+
+#     Parameters:
+#         df (pd.DataFrame): Exon dataframe with genomic coordinates and strand.
+#         gtf_path (str): Path to GTF file (e.g., GENCODE).
+#         chr_col, start_col, end_col, strand_col: Column names for genomic coordinates.
+
+#     Returns:
+#         pd.DataFrame: Two-column DataFrame with:
+#             - upstream_intron_length
+#             - downstream_intron_length
+#     """
+#     # Assign unique ID for joining later
+#     df = df.copy()
+#     df["region_id"] = df.index
+
+#     # Prepare your input exons as PyRanges
+#     exon_regions = df.rename(columns={
+#         chr_col: "Chromosome",
+#         start_col: "Start",
+#         end_col: "End",
+#         strand_col: "Strand"
+#     })[["Chromosome", "Start", "End", "Strand", "region_id"]]
+#     exon_pr = pr.PyRanges(exon_regions)
+
+#     # Read GTF and extract introns by transcript
+#     gtf_df = pr.read_gtf(gtf_path).df
+#     exons_df = gtf_df[gtf_df.Feature == "exon"]
+#     exons_pr = pr.PyRanges(exons_df)
+
+#     # Derive strand-aware introns grouped by transcript
+#     introns_pr = exons_pr.invert().merge(by="Transcript_ID")
+
+#     # Find nearest upstream and downstream introns
+#     up = exon_pr.nearest(introns_pr, strand=True, how="upstream").df
+#     down = exon_pr.nearest(introns_pr, strand=True, how="downstream").df
+
+#     # Compute intron lengths
+#     up["upstream_intron_length"] = up["End_b"] - up["Start_b"]
+#     down["downstream_intron_length"] = down["End_b"] - down["Start_b"]
+
+#     # Merge back with original using region_id to preserve alignment
+#     intron_lengths = (
+#         df[["region_id"]]
+#         .merge(up[["region_id", "upstream_intron_length"]], on="region_id", how="left")
+#         .merge(down[["region_id", "downstream_intron_length"]], on="region_id", how="left")
+#         .set_index(df.index)
+#         .drop(columns="region_id")
+#     )
+
+#     return intron_lengths
+
+
+# # XXX new
+# def add_intron_lengths(df, gtf_path="/home/ch232619/denisko/data/iralu/gencode.v44.annotation.gtf", 
+#                        chr_col="exon_chr", start_col="exon_start", end_col="exon_end", strand_col="exon_strand"):
+#     """
+#     Returns upstream and downstream intron lengths for each exon in the given DataFrame.
+
+#     Parameters:
+#         df (pd.DataFrame): DataFrame with exon position and strand info.
+#         gtf_path (str): Path to a GTF file (e.g. GENCODE hg38).
+#         chr_col, start_col, end_col, strand_col: Column names in df.
+
+#     Returns:
+#         pd.DataFrame: Two-column DataFrame (aligned to input df) with:
+#             - upstream_intron_length
+#             - downstream_intron_length
+#     """
+#     df = df.copy()
+#     df["exon_id"] = df.index.astype(str)
+
+#     bed_lines = df.apply(
+#         lambda row: f"{row[chr_col]}\t{row[start_col]}\t{row[end_col]}\t{row['exon_id']}\t0\t{row[strand_col]}",
+#         axis=1
+#     )
+#     exon_bedtool = BedTool("\n".join(bed_lines), from_string=True).sort()
+
+#     gtf = BedTool(gtf_path)
+#     exons = gtf.filter(lambda f: f[2] == "exon").saveas()
+#     introns = exons.introns().sort()
+
+#     print("Number of introns:", len(introns))
+#     for feature in introns[:5]:
+#         print(f"Intron: {feature.chrom}:{feature.start}-{feature.end}")
+
+
+#     # Strand-aware closest introns
+#     upstream = exon_bedtool.closest(introns, s=True, D="ref", id=True)
+#     downstream = exon_bedtool.closest(introns, s=True, D="ref", iu=True)
+
+#     cols = [
+#         "exon_chr", "exon_start", "exon_end", "exon_id", "score", "strand",
+#         "intron_chr", "intron_start", "intron_end", "intron_info", "dist"
+#     ]
+#     df_up = upstream.to_dataframe(names=cols, header=None)
+#     df_down = downstream.to_dataframe(names=cols, header=None)
+
+#     df_up["exon_id"] = df_up["exon_id"].astype(str)
+#     df_down["exon_id"] = df_down["exon_id"].astype(str)
+
+#     df_up["upstream_intron_length"] = df_up["intron_end"] - df_up["intron_start"]
+#     df_down["downstream_intron_length"] = df_down["intron_end"] - df_down["intron_start"]
+
+#     display(df_up[["exon_id", "upstream_intron_length"]].head())
+#     display(df_down[["exon_id", "downstream_intron_length"]].head())
+#     # Merge only the two columns by exon_id
+#     result = (
+#         df[["exon_id"]]
+#         .merge(df_up[["exon_id", "upstream_intron_length"]], on="exon_id", how="left")
+#         .merge(df_down[["exon_id", "downstream_intron_length"]], on="exon_id", how="left")
+#         .drop(columns="exon_id")
+#     )
+
+#     # Reindex to match the original df (ensures alignment even if merge dropped rows)
+#     result = result.reindex(df.index)
+#     display(result.head())
+
+#     # Ensure same number of rows
+#     assert len(result) == len(df), "Row count mismatch after merging intron data."
+#     return result
+
+
+# def add_gc_content(df, fasta_path="/lab-share/Gene-Lee-ANR-e2/denisko/iralus/mfe/bed/240221-10k-test/ref/hg38.fa", 
+#                    chr_col="exon_chr", start_col="upstream_alu_start", end_col="downstream_alu_end", strand_col="exon_strand"):
+#     """
+#     Adds a gc_content column based on reference genome sequences.
+
+#     Parameters:
+#         df (pd.DataFrame): DataFrame with genomic coordinates.
+#         fasta_path (str): Path to FASTA file (e.g., hg38.fa).
+#         chr_col, start_col, end_col, strand_col (str): Column names.
+
+#     Returns:
+#         pd.Series: GC content values (float) aligned with df.
+#     """
+#     df = df.copy()
+#     df["region_id"] = df.index.astype(str)
+
+#     # Build BED lines
+#     bed_lines = df.apply(
+#         lambda row: f"{row[chr_col]}\t{row[start_col]}\t{row[end_col]}\t{row['region_id']}\t0\t{row[strand_col]}",
+#         axis=1
+#     )
+#     bed = BedTool("\n".join(bed_lines), from_string=True)
+
+#     # Get FASTA sequences for regions
+#     fasta = bed.sequence(fi=fasta_path, s=True, name=True)
+    
+#     # Parse FASTA output
+#     with open(fasta.seqfn) as f:
+#         seq_lines = f.read().split(">")[1:]
+
+#     gc_by_id = {}
+#     for entry in seq_lines:
+#         header, seq = entry.strip().split("\n", 1)
+#         region_id = header.split()[0]
+#         sequence = seq.replace("\n", "").upper()
+#         gc_by_id[region_id] = gc_fraction(sequence)
+
+#     # Return aligned GC values
+#     return df["region_id"].map(gc_by_id)
+
+
+def run_pairplot_window(alu_dct, window, ks_test=False, cv=0, n_sample=0, inverted=False, display_dfs=False):
     """
     window: '5kb'
     """
@@ -694,22 +1010,34 @@ def run_pairplot_window(alu_dct, window, ks_test=False, cv=0, n_sample=0, invert
     #   add_alu_len_exon_len_cols(concat_inverted_pairs_df, pairs=True))
     
     concat_pairs_df[["upstream_alu_len", "downstream_alu_len", "exon_len", 
-                     "intra_alu_len","alu1_end_to_alu2_start", "alu2_end_to_alu1_start"]] = (
-       add_alu_len_exon_len_cols(concat_pairs_df, pairs=True))
+                     "intra_alu_len", "alu1_end_to_alu2_start", "alu2_end_to_alu1_start"]] = (
+       add_alu_len_exon_len_cols(concat_pairs_df, pairs=True)) # XXX "alu1_end_to_alu2_start", "alu2_end_to_alu1_start" can we remove these cols downstream?
     concat_inverted_pairs_df[["upstream_alu_len", "downstream_alu_len", "exon_len", 
                               "intra_alu_len", "alu1_end_to_alu2_start", "alu2_end_to_alu1_start"]] = (
-       add_alu_len_exon_len_cols(concat_inverted_pairs_df, pairs=True))
+       add_alu_len_exon_len_cols(concat_inverted_pairs_df, pairs=True)) # XXX "alu1_end_to_alu2_start", "alu2_end_to_alu1_start" can we remove these cols downstream?
     # new
     concat_noninverted_pairs_df[["upstream_alu_len", "downstream_alu_len", "exon_len", 
                               "intra_alu_len", "alu1_end_to_alu2_start", "alu2_end_to_alu1_start"]] = (
-       add_alu_len_exon_len_cols(concat_noninverted_pairs_df, pairs=True))
+       add_alu_len_exon_len_cols(concat_noninverted_pairs_df, pairs=True)) # XXX "alu1_end_to_alu2_start", "alu2_end_to_alu1_start" can we remove these cols downstream?
     
-    cols_display = ["exon_chr", "exon_start", "exon_end", 
-                    "upstream_alu_start", "upstream_alu_end", "downstream_alu_start", "downstream_alu_end",
-                    "intra_alu_len", "alu1_end_to_alu2_start", "alu2_end_to_alu1_start"]
-    #display(concat_pairs_df[cols_display].head())
-    #display(concat_inverted_pairs_df[cols_display].head())
-    #display(concat_noninverted_pairs_df[cols_display].head())
+    # This section for intron_length and gc_content was added then removed....
+    # concat_pairs_df[["upstream_intron_length", "downstream_intron_length"]]             = add_intron_lengths(concat_pairs_df)
+    # concat_inverted_pairs_df[["upstream_intron_length", "downstream_intron_length"]]    = add_intron_lengths(concat_inverted_pairs_df)
+    # concat_noninverted_pairs_df[["upstream_intron_length", "downstream_intron_length"]] = add_intron_lengths(concat_noninverted_pairs_df)
+    #concat_pairs_df["gc_content"] = add_gc_content(concat_pairs_df)
+    #concat_inverted_pairs_df["gc_content"] = add_gc_content(concat_inverted_pairs_df)
+    #concat_noninverted_pairs_df["gc_content"] = add_gc_content(concat_noninverted_pairs_df)
+
+    if display_dfs:
+        cols_display = ["exon_chr", "exon_start", "exon_end", 
+                        "upstream_alu_start", "upstream_alu_end", "downstream_alu_start", "downstream_alu_end",
+                        "intra_alu_len", "alu1_end_to_alu2_start", "alu2_end_to_alu1_start",
+                        "upstream_intron_length", "downstream_intron_length", 
+                        "alu_span_GC_content", "intron_span_GC_content", 
+                        "up_alu_count", "down_alu_count"]  # XXX new and passed in
+        display(concat_pairs_df[cols_display].head())
+        display(concat_inverted_pairs_df[cols_display].head())
+        display(concat_noninverted_pairs_df[cols_display].head())
 
     # run KS test
     if ks_test:
@@ -825,10 +1153,19 @@ def plot_ks_result(ks_dct, window, cv=0, n_sample=0, ax=None, show_legend=True, 
                            "exon_len": "Exon length", 
                            "upstream_dist": "Upstream Alu distance to exon",
                            "downstream_dist": "Downstream Alu distance to exon", 
-                           "intra_alu_len": "Intra-Alu distance"}
+                           "intra_alu_len": "Intra-Alu distance", 
+                           "upstream_intron_length": "Upstream intron length",
+                           "downstream_intron_length": "Downstream intron length", 
+                           "alu_span_GC_content": "Alu span GC content",
+                           "intron_span_GC_content": "Intron span GC content", 
+                           "up_alu_count": "Upstream intron Alu count", 
+                           "down_alu_count": "Downstream intron Alu count"} # XXX new
         feature_order = ["Upstream Alu length", "Downstream Alu length",
                          "Upstream Alu distance to exon", "Downstream Alu distance to exon",
-                         "Intra-Alu distance", "Exon length"]
+                         "Upstream intron length", "Downstream intron length",
+                         "Intra-Alu distance", "Exon length", 
+                         "Alu span GC content", "Intron span GC content", 
+                         "Upstream intron Alu count", "Downstream intron Alu count"] # XXX new
         ks_df_melt["fixed_category"] = ks_df_melt["fixed_category"].map(category_mapping_subscripts)
         ks_df_melt["feature"] = ks_df_melt["feature"].map(feature_mapping)
         
@@ -837,8 +1174,15 @@ def plot_ks_result(ks_dct, window, cv=0, n_sample=0, ax=None, show_legend=True, 
             fig, ax1 = plt.subplots(figsize=(12, 6))
         
         colorblind_palette = sns.color_palette('colorblind')
-        selected_colors = colorblind_palette[2:8]
+        backup_palette = sns.color_palette('tab20', 12)
+        
+        #selected_colors = colorblind_palette[2:8]
+        #selected_colors = selected_colors[1:] + [selected_colors[0]]
+        
+        #colorblind_palette = list(colorblind_palette)
+        selected_colors = colorblind_palette[2:10]
         selected_colors = selected_colors[1:] + [selected_colors[0]]
+        selected_colors = selected_colors + backup_palette[8:] #[backup_palette[10], backup_palette[11]]
 
         fontsize_min = 5
         #sns.set_theme() #font_scale=1.4
@@ -855,9 +1199,9 @@ def plot_ks_result(ks_dct, window, cv=0, n_sample=0, ax=None, show_legend=True, 
                     err_kws={'linewidth': 0.5}) #viridis
         sns.stripplot(data=ks_df_melt, x='fixed_category', y='neglog10pvals', hue="feature", 
                       palette=selected_colors, dodge=True, alpha=0.6, legend=False, 
-                      hue_order=feature_order, edgecolor="black", linewidth=0.25, ax=ax, size=2) #edgecolor="black"
+                      hue_order=feature_order, edgecolor="black", linewidth=0.1, ax=ax, size=1) #size=2, linewidth=0.25, edgecolor="black"
         if ax:
-            ax.axhline(-np.log(0.05), ls='--', linewidth=0.5)
+            ax.axhline(-np.log10(0.05), ls='--', linewidth=0.5)  #XXX updated to -np.log10(0.05)
             ax.tick_params(axis='x', rotation=90, labelsize=fontsize_min, 
                            pad=tick_params_pad, length=tick_params_length, width=tick_params_width) #14
             ax.tick_params(axis='y', labelsize=fontsize_min, 
@@ -876,9 +1220,12 @@ def plot_ks_result(ks_dct, window, cv=0, n_sample=0, ax=None, show_legend=True, 
                 ax.get_legend().remove()
             for spine in ax.spines.values():
                 spine.set_linewidth(0.25)
+            
+            #fig = ax.get_figure() #XXX
+            #fig.tight_layout(rect=[0, 0, 0.98, 0.98]) #XXX left, bottom, right, top
         
         if not ax:
-            ax1.axhline(-np.log(0.05), ls='--')
+            ax1.axhline(-np.log10(0.05), ls='--')  #XXX updated to -np.log10(0.05)
             ax1.legend(title='', loc='upper center', bbox_to_anchor=(0.5, 1.25), #(0.5,1.12)
                       ncol=2, fancybox=True, shadow=False, borderaxespad=0.)
             plt.xticks(rotation=45, ha='right')

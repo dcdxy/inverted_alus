@@ -1143,7 +1143,7 @@ def swarmplot_p_values(results_df, title=None, log=False, use_string=False,
             #           ncol=1, fancybox=True, shadow=False, borderaxespad=0., 
             #           fontsize=fontsize_min, title="Window (bp)", title_fontsize=fontsize_min)
             ax_legend.legend(handles, labels, loc='center', bbox_to_anchor=(0.5, 0.5),
-                             ncol=10, fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min,
+                             ncol=5, fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min, #ncol=10
                              title="Window (bp)", title_fontsize=fontsize_min, 
                              columnspacing=0.5, borderpad=0.5, handletextpad=0.1, handlelength=0.6)
             ax_legend.axis('off')
@@ -1154,7 +1154,7 @@ def swarmplot_p_values(results_df, title=None, log=False, use_string=False,
     ax.tick_params(axis='x', labelsize=fontsize_min, 
                    width=tick_params_width, length=tick_params_length, pad=tick_params_pad)
     for label in ax.get_xticklabels():
-        label.set_rotation(25)
+        label.set_rotation(45)  #25
     ax.tick_params(axis='y', labelsize=fontsize_min, 
                    width=tick_params_width, length=tick_params_length, pad=tick_params_pad)
 
