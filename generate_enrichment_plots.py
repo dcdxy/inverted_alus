@@ -45,20 +45,6 @@ def generate_dfs_windows(window, skipped_exon_df, control_df, ir=True, header="b
         return flank_df, control_flank_df
 
 
-#bedops_skippable_subset_f, constitutive_subset_ctrl_f = (generate_dfs(
-#    bedops_skippable_subset, bedops_constitutive_subset, ir=False, 
-#    header="bedops", exon_db=True))
-#bedops_skippable_subset            = remove_shared_exons(bedops_skippable, skippable_set, 
-#                                                         exon_type="skippable", exon_db="hexevent",
-#                                                         verbose=True)
-#bedops_exonskipdb_skippable_subset = remove_shared_exons(bedops_exonskipdb_skippable, skippable_set,
-#                                                         exon_type="skippable", exon_db="exonskipdb",
-#                                                         verbose=True)
-#bedops_constitutive_subset         = remove_shared_exons(bedops_constitutive, constitutive_set,
-#                                                         exon_type="constitutive", exon_db="hexevent",
-#                                                         verbose=True)
-
-
 def generate_dfs_windows_subset(window, 
                                 hexevent_skipped_exon_df, 
                                 exonskipdb_skipped_exon_df,
@@ -85,7 +71,6 @@ def generate_dfs_windows_subset(window,
     #window_df = skipped_exon_df[skipped_exon_df['dist'].between(-w, w)].dropna(how='any')
     #window_df = window_df.rename_axis('idx').reset_index().astype({'dist': 'int'})
     
-    # Added 2024-01-11
     # Skippable set can be from "hexevent" or "exonskipdb"
     hexevent_skipped_exon_df_subset = (
         remove_shared_exons(
@@ -143,7 +128,7 @@ def generate_dfs_windows_subset(window,
     hexevent_window_df_subset = create_window_df(hexevent_skipped_exon_df_subset)
     exonskipdb_window_df_subset = create_window_df(exonskipdb_skipped_exon_df_subset)
     window_df_subset = merge_skippable_dfs(hexevent_window_df_subset, exonskipdb_window_df_subset, window=True)
-    skippable_subset = merge_skippable_dfs(hexevent_skipped_exon_df_subset, exonskipdb_skipped_exon_df_subset, window=True) # new
+    skippable_subset = merge_skippable_dfs(hexevent_skipped_exon_df_subset, exonskipdb_skipped_exon_df_subset, window=True)
     print(len(skippable_subset))
     
     hexevent_flank_df = create_flanking_df(w, hexevent_skipped_exon_df_subset, header="bedops", exon_db=True, discrete=discrete) # skipped_exon_df
@@ -153,22 +138,22 @@ def generate_dfs_windows_subset(window,
     
     if ir:
         ir_flank_df = filter_inverted_pair(flank_df.copy())
-        nonir_flank_df = filter_non_inverted_pair(flank_df.copy()) # XXX new
+        nonir_flank_df = filter_non_inverted_pair(flank_df.copy())
         control_ir_flank_df = filter_inverted_pair(control_flank_df.copy())
-        control_nonir_flank_df = filter_non_inverted_pair(control_flank_df.copy()) # XXX new
+        control_nonir_flank_df = filter_non_inverted_pair(control_flank_df.copy())
         
         return {"skippable": flank_df, 
                 "constitutive": control_flank_df,
                 "skippable_inverted": ir_flank_df,
                 "constitutive_inverted": control_ir_flank_df,
-                "skippable_noninverted": nonir_flank_df, # XXX added for MFE
-                "constitutive_noninverted": control_nonir_flank_df, # XXX added for MFE
-                "skippable_hexevent": hexevent_flank_df, # XXX added for Venn diagrams
-                "skippable_exonskipdb": exonskipdb_flank_df, # XXX added for Venn diagram
-                "skippable_hexevent_single_preflank": hexevent_skipped_exon_df_subset, # added for length distributions
-                "skippable_exonskipdb_single_preflank": exonskipdb_skipped_exon_df_subset, # added for length distributions
-                "skippable_merged_single_preflank": skippable_subset, # added for length distributions
-                "constitutive_single_preflank": control_df_subset, # added for length distributions
+                "skippable_noninverted": nonir_flank_df,
+                "constitutive_noninverted": control_nonir_flank_df,
+                "skippable_hexevent": hexevent_flank_df,
+                "skippable_exonskipdb": exonskipdb_flank_df,
+                "skippable_hexevent_single_preflank": hexevent_skipped_exon_df_subset,
+                "skippable_exonskipdb_single_preflank": exonskipdb_skipped_exon_df_subset,
+                "skippable_merged_single_preflank": skippable_subset,
+                "constitutive_single_preflank": control_df_subset,
                 "window": window_df_subset}
     else:
         return flank_df, control_flank_df
@@ -230,7 +215,6 @@ def test_table_across_windows(flank_df, control_flank_df,
     r1c1 = len(ir_flank_df)
     r1c2 = len(control_ir_flank_df)
     
-    # Update on 23-01-19: change the way the pairs are counted (don't bias towards IR Alus)
     #r2c1 = len(flank_df) - len(ir_flank_df)
     #r2c2 = len(control_flank_df) - len(control_ir_flank_df)
     
@@ -254,7 +238,6 @@ def test_table_across_windows_exon(flank_df, control_flank_df,
     This function differs from test_table_across_windows() in that it counts the number of 
     exons rather than the number of Alu-Alu pairs.
     """
-    # also generate dictionaries?
     r1c1 = len(groupby_exons(ir_flank_df)) # number of exons with at least 1 flanking IR Alu pair
     r1c2 = len(groupby_exons(control_ir_flank_df)) # number of exons with at least 1 flanking IR Alu pair
     
@@ -287,7 +270,7 @@ def bar_plot_subfamilies(stats_df, window, r1c1_label, r1c2_label, title):
     #bonferroni_reject_list = stats_df[stats_df['bonferroni_reject']]['alu_subfamily'].tolist()
     bonferroni_reject_greater = stats_df[stats_df['bonferroni_reject_greater']]['alu_subfamily'].tolist()
     bonferroni_reject_less = stats_df[stats_df['bonferroni_reject_less']]['alu_subfamily'].tolist()
-    bonferroni_reject = stats_df[stats_df['bonferroni_reject_less'] | stats_df['bonferroni_reject_greater']]['alu_subfamily'].tolist() #XXX new
+    bonferroni_reject = stats_df[stats_df['bonferroni_reject_less'] | stats_df['bonferroni_reject_greater']]['alu_subfamily'].tolist()
     normal_color = 'steelblue'
     greater_color = 'crimson'
     less_color = 'green'
@@ -354,7 +337,6 @@ def test_table_across_windows_subfamily(window, flank_df, control_flank_df, ir_f
     pair=False
     comb=False
     
-    # New 23-01-23
     non_ir_flank_df = filter_non_inverted_pair(flank_df.copy())
     control_non_ir_flank_df = filter_non_inverted_pair(control_flank_df.copy())
     r2c1 = len(non_ir_flank_df)  # number of Alu pairs with at least 1 flanking non-IR Alu pair
@@ -368,7 +350,6 @@ def test_table_across_windows_subfamily(window, flank_df, control_flank_df, ir_f
                 ir_flank_df_single_alu = ir_flank_df[(ir_flank_df['upstream_alu_subfamily'] == ind_alu) | (ir_flank_df['downstream_alu_subfamily'] == ind_alu)]
                 control_ir_flank_df_single_alu = control_ir_flank_df[(control_ir_flank_df['upstream_alu_subfamily'] == ind_alu) | (control_ir_flank_df['downstream_alu_subfamily'] == ind_alu)]
                 
-                # New 23-01-23
                 non_ir_flank_df_single_alu = non_ir_flank_df[(non_ir_flank_df['upstream_alu_subfamily'] == ind_alu) | (non_ir_flank_df['downstream_alu_subfamily'] == ind_alu)]
                 control_non_ir_flank_df_single_alu = control_non_ir_flank_df[(control_non_ir_flank_df['upstream_alu_subfamily'] == ind_alu) | (control_non_ir_flank_df['downstream_alu_subfamily'] == ind_alu)]
                             
@@ -382,7 +363,7 @@ def test_table_across_windows_subfamily(window, flank_df, control_flank_df, ir_f
                 
                 result_dct = generate_contingency_table(r1c1, r1c2, r2c1, r2c2,
                                                         r1_label="Inverted pair & 1+ {}".format(ind_alu),
-                                                        #r2_label="Inverted pair & {} not in pair".format(ind_alu), #XXX
+                                                        #r2_label="Inverted pair & {} not in pair".format(ind_alu),
                                                         r2_label="Non-inverted pair & 1+ {}".format(ind_alu),
                                                         alu=ind_alu, chi=False)
                 stats_dct_list1.append(result_dct)
@@ -422,7 +403,7 @@ def run_across_windows(hexevent_skipped_exon_df,
                        exon_centric=False,
                        discrete=False):
     """
-    Updated 2024-01-11: Use filtered exon sets by running generate_dfs_windows_subset()
+    Use filtered exon sets by running generate_dfs_windows_subset()
     Modified from: 02_ir_alus_plots_windows.ipynb
     Wrapper to run the main enrichment function across range of window sizes.
     """
@@ -441,8 +422,8 @@ def run_across_windows(hexevent_skipped_exon_df,
                 ir=True,
                 header=header, 
                 discrete=discrete)
-            ) # updated 24-01-12
-        # removed window_df on 24-01-12
+            )
+
         if not exon_centric:
             results1 = test_table_across_windows(flank_df=window_dct["skippable"],
                                                  control_flank_df=window_dct["constitutive"],
@@ -508,12 +489,12 @@ def run_subfamily_enrichment(df_skip_hex, df_skip_esdb, df_const, exon_sets, pai
                             "r1c2": results_window["r1c2"],
                             "r2c1": results_window["r2c1"],
                             "r2c2": results_window["r2c2"],
-                            "log10p": -np.log10(results_window["fisher_greater_p"])} # XXX should be multiple-testing corrected?
+                            "log10p": -np.log10(results_window["fisher_greater_p"])}
         
         print(plot_dct[window])
     
     results_df_singlealuirpair_df = pd.concat(results, ignore_index=True)
-    return results, plot_dct, results_df_singlealuirpair_df # XXX should return Bonferroni p-value
+    return results, plot_dct, results_df_singlealuirpair_df
     #swarmplot_p_values(results_df_singlealuirpair_df, title=None, log=False)
 
 
@@ -625,7 +606,7 @@ def test_table(window, flank_df, control_flank_df,
     
     window: length upstream and downstream of exon to search within
     
-    # don't want to regenerate the four df params below bc takes a while
+    # regenerating the four df params below takes a while
     flank_df = from create_flanking_df(window, closest_exon_df)
     control_flank_df = create_flanking_df(window, closest_const_exon_df)
     ir_flank_df = filter_inverted_pair(flank_df)
@@ -653,7 +634,6 @@ def test_table(window, flank_df, control_flank_df,
     
     # next create all entries in 2x2 table according to flags/params
     elif alu:
-        # Added 23-01-23
         non_ir_flank_df = filter_non_inverted_pair(flank_df.copy())
         control_non_ir_flank_df = filter_non_inverted_pair(control_flank_df.copy())
         
@@ -687,23 +667,15 @@ def test_table(window, flank_df, control_flank_df,
             stats_dct_list2 = []
             stats_dct_list3 = []
             for ind_alu in list(set(window_df_counts.index)):
-                # Replaced on 23-12-11
                 ir_flank_df_single_alu = filter_inclusion_alu_single(ir_flank_df, ind_alu)
                 control_ir_flank_df_single_alu = filter_inclusion_alu_single(control_ir_flank_df, ind_alu)
-                #ir_flank_df_single_alu = ir_flank_df[(ir_flank_df['upstream_alu_subfamily'] == ind_alu) | (ir_flank_df['downstream_alu_subfamily'] == ind_alu)]
-                #control_ir_flank_df_single_alu = control_ir_flank_df[(control_ir_flank_df['upstream_alu_subfamily'] == ind_alu) | (control_ir_flank_df['downstream_alu_subfamily'] == ind_alu)]
                 
-                # Added 23-01-23 and replaced on 23-12-11
                 non_ir_flank_df_single_alu = filter_inclusion_alu_single(non_ir_flank_df, ind_alu)
                 control_non_ir_flank_df_single_alu = filter_inclusion_alu_single(control_non_ir_flank_df, ind_alu)
-                #non_ir_flank_df_single_alu = non_ir_flank_df[(non_ir_flank_df['upstream_alu_subfamily'] == ind_alu) | (non_ir_flank_df['downstream_alu_subfamily'] == ind_alu)]
-                #control_non_ir_flank_df_single_alu = control_non_ir_flank_df[(control_non_ir_flank_df['upstream_alu_subfamily'] == ind_alu) | (control_non_ir_flank_df['downstream_alu_subfamily'] == ind_alu)]
                 
                 r1c1 = len(ir_flank_df_single_alu)
                 r1c2 = len(control_ir_flank_df_single_alu)
-                #r2c1 = len(ir_flank_df) - len(ir_flank_df_single_alu) # previous 
                 r2c1 = len(non_ir_flank_df_single_alu)
-                #r2c2 = len(control_ir_flank_df) - len(control_ir_flank_df_single_alu)  # previous
                 r2c2 = len(control_non_ir_flank_df_single_alu)
                 result_dct = generate_contingency_table(r1c1, r1c2, r2c1, r2c2,
                                                         r1_label="Inverted pair & 1+ {}".format(ind_alu),
@@ -727,7 +699,7 @@ def test_table(window, flank_df, control_flank_df,
                 r2c2 = len(control_ir_flank_df) - len(control_ir_flank_df_single_alu)
                 result_dct = generate_contingency_table(r1c1, r1c2, r2c1, r2c2,
                                                         r1_label="Inverted pair & 1+ {}".format(ind_alu),
-                                                        r2_label="Inverted pair & {} not in pair".format(ind_alu), #XXX
+                                                        r2_label="Inverted pair & {} not in pair".format(ind_alu),
                                                         alu=ind_alu, chi=False)
                 stats_dct_list3.append(result_dct)
             
@@ -760,28 +732,21 @@ def test_table(window, flank_df, control_flank_df,
             stats_dct_list2 = []
             stats_dct_list3 = []
             for ind_alu in list(set(window_df_counts.index)):
-                # Replaced on 23-12-11
                 flank_df_dup_alu = filter_exact_alu_duplicate_pair(flank_df, ind_alu)
                 control_flank_df_dup_alu = filter_exact_alu_duplicate_pair(control_flank_df, ind_alu)
-                #flank_df_dup_alu = flank_df[(flank_df['upstream_alu_subfamily'] == ind_alu) & (flank_df['downstream_alu_subfamily'] == ind_alu)]
-                #control_flank_df_dup_alu = control_flank_df[(control_flank_df['upstream_alu_subfamily'] == ind_alu) & (control_flank_df['downstream_alu_subfamily'] == ind_alu)]
 
                 r1c1 = len(flank_df_dup_alu)
                 r1c2 = len(control_flank_df_dup_alu)
                 r2c1 = len(flank_df) - len(flank_df_dup_alu)
                 r2c2 = len(control_flank_df) - len(control_flank_df_dup_alu)
-                #print(r1c1, r1c2, r2c1, r2c2)
                 result_dct = generate_contingency_table(r1c1, r1c2, r2c1, r2c2,
                                                         r1_label="{} and {}".format(ind_alu, ind_alu),
                                                         r2_label="All other pairs",
                                                         alu=ind_alu, chi=False)
                 stats_dct_list1.append(result_dct)
 
-                # Replaced on 23-12-11
                 ir_flank_df_dup_alu = filter_exact_alu_duplicate_pair(ir_flank_df, ind_alu)
                 control_ir_flank_df_dup_alu = filter_exact_alu_duplicate_pair(control_ir_flank_df, ind_alu)
-                #ir_flank_df_dup_alu = ir_flank_df[(ir_flank_df['upstream_alu_subfamily'] == ind_alu) & (ir_flank_df['downstream_alu_subfamily'] == ind_alu)]
-                #control_ir_flank_df_dup_alu = control_ir_flank_df[(control_ir_flank_df['upstream_alu_subfamily'] == ind_alu) & (control_ir_flank_df['downstream_alu_subfamily'] == ind_alu)]
             
                 r1c1 = len(ir_flank_df_dup_alu)
                 r1c2 = len(control_ir_flank_df_dup_alu)
@@ -829,7 +794,7 @@ def test_table(window, flank_df, control_flank_df,
         elif (pair == True) and (comb == True):
             result_dct_list = []
             result_dct_list2 = []
-            result_dct_list3 = []  # new
+            result_dct_list3 = []
             for alu_pair in list(combinations(list(set(window_df_counts.index)),2)):
                 
                 # Replaced long chained statements below with function on 23-12-08
@@ -840,16 +805,7 @@ def test_table(window, flank_df, control_flank_df,
                 
                 non_ir_flank_df_alu_pair = filter_inclusion_alu_pair(non_ir_flank_df, alu_pair)
                 control_non_ir_flank_df_alu_pair = filter_inclusion_alu_pair(control_non_ir_flank_df, alu_pair)
-                
-                #flank_df_alu_pair = flank_df[((flank_df['upstream_alu_subfamily'] == alu_pair[0]) & (flank_df['downstream_alu_subfamily'] == alu_pair[1])) | ((flank_df['upstream_alu_subfamily'] == alu_pair[1]) & (flank_df['downstream_alu_subfamily'] == alu_pair[0]))]
-                #control_flank_df_alu_pair = control_flank_df[((control_flank_df['upstream_alu_subfamily'] == alu_pair[0]) & (control_flank_df['downstream_alu_subfamily'] == alu_pair[1])) | ((control_flank_df['upstream_alu_subfamily'] == alu_pair[1]) & (control_flank_df['downstream_alu_subfamily'] == alu_pair[0]))]
-                #ir_flank_df_alu_pair = ir_flank_df[((ir_flank_df['upstream_alu_subfamily'] == alu_pair[0]) & (ir_flank_df['downstream_alu_subfamily'] == alu_pair[1])) | ((ir_flank_df['upstream_alu_subfamily'] == alu_pair[1]) & (ir_flank_df['downstream_alu_subfamily'] == alu_pair[0]))]
-                #control_ir_flank_df_alu_pair = control_ir_flank_df[((control_ir_flank_df['upstream_alu_subfamily'] == alu_pair[0]) & (control_ir_flank_df['downstream_alu_subfamily'] == alu_pair[1])) | ((control_ir_flank_df['upstream_alu_subfamily'] == alu_pair[1]) & (control_ir_flank_df['downstream_alu_subfamily'] == alu_pair[0]))]
-                
-                # Added 23-01-24: New FE tests
-                #non_ir_flank_df_alu_pair = non_ir_flank_df[((non_ir_flank_df['upstream_alu_subfamily'] == alu_pair[0]) & (non_ir_flank_df['downstream_alu_subfamily'] == alu_pair[1])) | ((non_ir_flank_df['upstream_alu_subfamily'] == alu_pair[1]) & (non_ir_flank_df['downstream_alu_subfamily'] == alu_pair[0]))]
-                #control_non_ir_flank_df_alu_pair = control_non_ir_flank_df[((control_non_ir_flank_df['upstream_alu_subfamily'] == alu_pair[0]) & (control_non_ir_flank_df['downstream_alu_subfamily'] == alu_pair[1])) | ((control_non_ir_flank_df['upstream_alu_subfamily'] == alu_pair[1]) & (control_non_ir_flank_df['downstream_alu_subfamily'] == alu_pair[0]))]
-                
+                                
                 # Find total num of pairs (upstream/downstream agnostic)
                 # Find num of inverted pairs (upstream/downstream agnostic)
                 result_dct_list.append({"pair": alu_pair, "flank": len(flank_df_alu_pair), "control_flank": len(control_flank_df_alu_pair), "ir_flank": len(ir_flank_df_alu_pair), "ir_control_flank": len(control_ir_flank_df_alu_pair)})       
@@ -864,7 +820,6 @@ def test_table(window, flank_df, control_flank_df,
                                                         alu=alu_pair, chi=False, verbose=False)
                 result_dct_list2.append(results_dct)
                 
-                # Added 23-01-24
                 r2c1 = len(non_ir_flank_df_alu_pair)
                 r2c2 = len(control_non_ir_flank_df_alu_pair)
                 results_dct3 = generate_contingency_table(r1c1, r1c2, r2c1, r2c2,
@@ -877,7 +832,6 @@ def test_table(window, flank_df, control_flank_df,
             results_df2 = pd.DataFrame(result_dct_list2)
             results_df3 = pd.DataFrame(result_dct_list3)
             
-            # New
             #stats_df1 = pd.DataFrame(stats_dct_list1)
             plot1_r1c1_label = "Flanking skipped exons"
             plot1_r1c2_label = "Flanking constitutive exons"
@@ -933,7 +887,6 @@ def generate_melt_df_for_enrichment_plot(enrichment_dct):
     #r2c1 = len(flank_df) - len(ir_flank_df)
     #r2c2 = len(control_flank_df) - len(control_ir_flank_df)
     
-    # updated on 24-04-23 to include Bonferroni-corrected p-values
     # df_melt = pd.melt(pd.DataFrame.from_dict(enrichment_dct, orient="index")
     #                   .reset_index()
     #                   .rename(columns={"index": "window",
@@ -999,7 +952,7 @@ def generate_enrichment_plot(df_melt, ylabel, xlabel=False, legend=True, ax_lege
     ax1.set_xlim([-0.5, len(df_melt['window'].unique()) - 0.5])
     
     ax2 = ax1.twinx()
-    ax2.plot(ax1.get_xticks(), df_melt["bonferroni_neglog10_p"].iloc[0:10], color="g", linewidth=0.25) # updated 240423; previouly "log10p"
+    ax2.plot(ax1.get_xticks(), df_melt["bonferroni_neglog10_p"].iloc[0:10], color="g", linewidth=0.25)
     ax1.xaxis.grid(True, linewidth=tick_params_width) 
 
     if not xlabel:
@@ -1091,7 +1044,6 @@ def swarmplot_p_values(results_df, title=None, log=False, use_string=False,
     # selected_colors = colorblind_palette[2:8]
     # selected_colors = selected_colors[1:] + [selected_colors[0]]
     
-    # Update palette on 24-07-12
     #bidirectional_palette = sns.color_palette('coolwarm', as_cmap=True)
     #n_colors = 6
     #selected_colors = sns.color_palette(bidirectional_palette, n_colors=n_colors)

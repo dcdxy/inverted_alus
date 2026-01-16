@@ -39,9 +39,9 @@ def add_alu_len_exon_len_cols(df, pairs):
         #df["dist1"] = df["downstream_alu_start"] - df["upstream_alu_end"]
         #df["dist2"] = df["upstream_alu_start"] - df["downstream_alu_end"]
         #df["intra_alu_len"] = df[["dist1", "dist2"]].abs().min(axis=1)
-        df["intra_alu_len"] = df.apply(calc_intra_dist, axis=1) # XXX updated on 08-01-2025
+        df["intra_alu_len"] = df.apply(calc_intra_dist, axis=1)
         assert (df["intra_alu_len"].dropna() > 0).all(), "Some intra_alu_len values are not positive!"
-        df["dist1"] = 0 #XXX remove dist1 and dist2 unless needed later
+        df["dist1"] = 0
         df["dist2"] = 0
         return df[["upstream_alu_len", "downstream_alu_len", "exon_len",
                    "intra_alu_len", "dist1", "dist2"]]
@@ -56,7 +56,6 @@ def generate_pairgrid_plot(df, cols, nrows_sample, window_size, title, inversion
     #                      "upstream_dist", "downstream_dist", "label"]
     pairgrid_pair_cols = cols
     
-    # XXX new
     df = df.copy()
     df[["upstream_dist", "downstream_dist"]] = df[["upstream_dist", "downstream_dist"]].abs()
     
@@ -99,7 +98,7 @@ def generate_pairgrid_plot(df, cols, nrows_sample, window_size, title, inversion
         hue_order=hue_order[::-1], # reversed
         palette=[orange, blue]
     )
-    g.map_diag(sns.histplot, rasterized=True) # XXX
+    g.map_diag(sns.histplot, rasterized=True) 
     g.map_upper(sns.scatterplot, s=10, alpha=.2, rasterized=True)
     g.map_lower(sns.kdeplot)
 
@@ -222,7 +221,7 @@ def jitter(values, j):
 def run_ks_2sample_test_2sided(df1, df2, col):
     """Updated to "mask" NaN values by using nan_policy="omit". That way we don't have to filter out exons completely.
     """
-    return ks_2samp(df1[col], df2[col], alternative="two-sided", method="auto", nan_policy="omit")  # XXX updated to use nan_policy="omit" on 08/07/25 to handle NaN values
+    return ks_2samp(df1[col], df2[col], alternative="two-sided", method="auto", nan_policy="omit")  # updated to use nan_policy="omit" to handle NaN values
 
 def run_ks_test(df1, df2_inverted, df3_noninverted, cv=0, n_sample=0):
     """
@@ -230,10 +229,10 @@ def run_ks_test(df1, df2_inverted, df3_noninverted, cv=0, n_sample=0):
     n_sample=1000
     """
     pairgrid_pair_cols = ["upstream_alu_len", "downstream_alu_len", "exon_len",  
-                          "upstream_dist", "downstream_dist", "intra_alu_len",  # XXX how are upstream_dist and downstream_dist computed?
+                          "upstream_dist", "downstream_dist", "intra_alu_len",
                           "upstream_intron_length", "downstream_intron_length", 
                           "alu_span_GC_content", "intron_span_GC_content", 
-                          "up_alu_count", "down_alu_count"]  # XXX new from 08-01-2025
+                          "up_alu_count", "down_alu_count"]
     fixed_categories = ["skippable", "constitutive", "inverted", "noninverted", "all"]
     
     if cv > 0:
@@ -255,7 +254,7 @@ def run_ks_test(df1, df2_inverted, df3_noninverted, cv=0, n_sample=0):
                 ks_res_skip = (
                     run_ks_2sample_test_2sided(df1=df1_skippable,
                                                df2=df2_inverted_skippable,
-                                               col=col)  # XXX mask here
+                                               col=col)
                 )
                 ks_res_cons = (
                     run_ks_2sample_test_2sided(df1=df1_constitutive,
@@ -550,7 +549,7 @@ def generate_violin_plot_multi(df_all, df_inv, df_noninv, window_size, title, y_
             ax.set_yticks(np.arange(0, 30001, 2500)) #15001
             ax.set_ylabel("Downstream \nintron length (bp)", fontsize=fontsize_min, labelpad=axis_label_pad)
 
-    #ax.set_ylim(-20, 350) #XXX for now
+    #ax.set_ylim(-20, 350)
     #ax.set_yticks(np.arange(0, 351, 50))
     
     # if y_col == "exon_len":
@@ -591,7 +590,7 @@ def generate_violin_plot_multi(df_all, df_inv, df_noninv, window_size, title, y_
             gridsize=400,
             #bw_method=0.2,
             bw_adjust=1,
-            split=True, #XXX new
+            split=True,
             cut=0,
             gap=0.2, 
             # inner="quart",
@@ -602,7 +601,7 @@ def generate_violin_plot_multi(df_all, df_inv, df_noninv, window_size, title, y_
         ticks = [1, 10, 100, 1000, 10000, 100000]
         ax.set_yticks(np.log10(ticks))
         ax.set_yticklabels([str(t) for t in ticks], fontsize=fontsize_min)
-        #ax.set_ylim(top=np.log10(999999))  # XXX
+        #ax.set_ylim(top=np.log10(999999)) 
         ax.tick_params(axis='y', labelsize=fontsize_min)
         ax.set_ylabel(y_col, fontsize=fontsize_min)
 
@@ -640,7 +639,7 @@ def generate_violin_plot_multi(df_all, df_inv, df_noninv, window_size, title, y_
     #     # ax.legend(title='', loc='upper center', bbox_to_anchor=(0.5, 1.25), 
     #     #           ncol=1, fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)
     #     #ax.legend(title='', loc='lower center', bbox_to_anchor=(0.5, -1.25),
-    #     #          ncol=1, fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)  # XXX previous
+    #     #          ncol=1, fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)
     #     handles, labels = ax.get_legend_handles_labels()  # new 2025-08-18
     #     ax.get_legend().remove()  # new
     #     return handles, labels
@@ -726,7 +725,7 @@ def generate_histogram_multi(df, window_size, title, legend, ylabel, ax=None, zo
     ax.tick_params(axis='both', which='both', 
                    length=tick_params_length, width=tick_params_width, pad=tick_params_pad)
 
-    df = df.copy()  # XXX new
+    df = df.copy()
     df["upstream_dist"]   = -df["upstream_dist"].abs()  # Make upstream distances negative
     df["downstream_dist"] = df["downstream_dist"].abs()  # Ensure downstream distances are positive
     df_melted = pd.melt(df, id_vars=['label'], value_vars=['upstream_dist', 'downstream_dist'], 
@@ -801,176 +800,6 @@ def generate_histogram(df, window_size, title):
     plt.show()
 
 
-# import pandas as pd
-# import pyranges as pr
-
-# # XXX new
-# def add_intron_lengths_with_pyranges(df, gtf_path, chr_col="exon_chr", start_col="exon_start", end_col="exon_end", strand_col="exon_strand"):
-#     """
-#     Adds upstream and downstream intron lengths to a DataFrame using pyranges and a GTF file.
-
-#     Parameters:
-#         df (pd.DataFrame): Exon dataframe with genomic coordinates and strand.
-#         gtf_path (str): Path to GTF file (e.g., GENCODE).
-#         chr_col, start_col, end_col, strand_col: Column names for genomic coordinates.
-
-#     Returns:
-#         pd.DataFrame: Two-column DataFrame with:
-#             - upstream_intron_length
-#             - downstream_intron_length
-#     """
-#     # Assign unique ID for joining later
-#     df = df.copy()
-#     df["region_id"] = df.index
-
-#     # Prepare your input exons as PyRanges
-#     exon_regions = df.rename(columns={
-#         chr_col: "Chromosome",
-#         start_col: "Start",
-#         end_col: "End",
-#         strand_col: "Strand"
-#     })[["Chromosome", "Start", "End", "Strand", "region_id"]]
-#     exon_pr = pr.PyRanges(exon_regions)
-
-#     # Read GTF and extract introns by transcript
-#     gtf_df = pr.read_gtf(gtf_path).df
-#     exons_df = gtf_df[gtf_df.Feature == "exon"]
-#     exons_pr = pr.PyRanges(exons_df)
-
-#     # Derive strand-aware introns grouped by transcript
-#     introns_pr = exons_pr.invert().merge(by="Transcript_ID")
-
-#     # Find nearest upstream and downstream introns
-#     up = exon_pr.nearest(introns_pr, strand=True, how="upstream").df
-#     down = exon_pr.nearest(introns_pr, strand=True, how="downstream").df
-
-#     # Compute intron lengths
-#     up["upstream_intron_length"] = up["End_b"] - up["Start_b"]
-#     down["downstream_intron_length"] = down["End_b"] - down["Start_b"]
-
-#     # Merge back with original using region_id to preserve alignment
-#     intron_lengths = (
-#         df[["region_id"]]
-#         .merge(up[["region_id", "upstream_intron_length"]], on="region_id", how="left")
-#         .merge(down[["region_id", "downstream_intron_length"]], on="region_id", how="left")
-#         .set_index(df.index)
-#         .drop(columns="region_id")
-#     )
-
-#     return intron_lengths
-
-
-# # XXX new
-# def add_intron_lengths(df, gtf_path="/home/ch232619/denisko/data/iralu/gencode.v44.annotation.gtf", 
-#                        chr_col="exon_chr", start_col="exon_start", end_col="exon_end", strand_col="exon_strand"):
-#     """
-#     Returns upstream and downstream intron lengths for each exon in the given DataFrame.
-
-#     Parameters:
-#         df (pd.DataFrame): DataFrame with exon position and strand info.
-#         gtf_path (str): Path to a GTF file (e.g. GENCODE hg38).
-#         chr_col, start_col, end_col, strand_col: Column names in df.
-
-#     Returns:
-#         pd.DataFrame: Two-column DataFrame (aligned to input df) with:
-#             - upstream_intron_length
-#             - downstream_intron_length
-#     """
-#     df = df.copy()
-#     df["exon_id"] = df.index.astype(str)
-
-#     bed_lines = df.apply(
-#         lambda row: f"{row[chr_col]}\t{row[start_col]}\t{row[end_col]}\t{row['exon_id']}\t0\t{row[strand_col]}",
-#         axis=1
-#     )
-#     exon_bedtool = BedTool("\n".join(bed_lines), from_string=True).sort()
-
-#     gtf = BedTool(gtf_path)
-#     exons = gtf.filter(lambda f: f[2] == "exon").saveas()
-#     introns = exons.introns().sort()
-
-#     print("Number of introns:", len(introns))
-#     for feature in introns[:5]:
-#         print(f"Intron: {feature.chrom}:{feature.start}-{feature.end}")
-
-
-#     # Strand-aware closest introns
-#     upstream = exon_bedtool.closest(introns, s=True, D="ref", id=True)
-#     downstream = exon_bedtool.closest(introns, s=True, D="ref", iu=True)
-
-#     cols = [
-#         "exon_chr", "exon_start", "exon_end", "exon_id", "score", "strand",
-#         "intron_chr", "intron_start", "intron_end", "intron_info", "dist"
-#     ]
-#     df_up = upstream.to_dataframe(names=cols, header=None)
-#     df_down = downstream.to_dataframe(names=cols, header=None)
-
-#     df_up["exon_id"] = df_up["exon_id"].astype(str)
-#     df_down["exon_id"] = df_down["exon_id"].astype(str)
-
-#     df_up["upstream_intron_length"] = df_up["intron_end"] - df_up["intron_start"]
-#     df_down["downstream_intron_length"] = df_down["intron_end"] - df_down["intron_start"]
-
-#     display(df_up[["exon_id", "upstream_intron_length"]].head())
-#     display(df_down[["exon_id", "downstream_intron_length"]].head())
-#     # Merge only the two columns by exon_id
-#     result = (
-#         df[["exon_id"]]
-#         .merge(df_up[["exon_id", "upstream_intron_length"]], on="exon_id", how="left")
-#         .merge(df_down[["exon_id", "downstream_intron_length"]], on="exon_id", how="left")
-#         .drop(columns="exon_id")
-#     )
-
-#     # Reindex to match the original df (ensures alignment even if merge dropped rows)
-#     result = result.reindex(df.index)
-#     display(result.head())
-
-#     # Ensure same number of rows
-#     assert len(result) == len(df), "Row count mismatch after merging intron data."
-#     return result
-
-
-# def add_gc_content(df, fasta_path="/lab-share/Gene-Lee-ANR-e2/denisko/iralus/mfe/bed/240221-10k-test/ref/hg38.fa", 
-#                    chr_col="exon_chr", start_col="upstream_alu_start", end_col="downstream_alu_end", strand_col="exon_strand"):
-#     """
-#     Adds a gc_content column based on reference genome sequences.
-
-#     Parameters:
-#         df (pd.DataFrame): DataFrame with genomic coordinates.
-#         fasta_path (str): Path to FASTA file (e.g., hg38.fa).
-#         chr_col, start_col, end_col, strand_col (str): Column names.
-
-#     Returns:
-#         pd.Series: GC content values (float) aligned with df.
-#     """
-#     df = df.copy()
-#     df["region_id"] = df.index.astype(str)
-
-#     # Build BED lines
-#     bed_lines = df.apply(
-#         lambda row: f"{row[chr_col]}\t{row[start_col]}\t{row[end_col]}\t{row['region_id']}\t0\t{row[strand_col]}",
-#         axis=1
-#     )
-#     bed = BedTool("\n".join(bed_lines), from_string=True)
-
-#     # Get FASTA sequences for regions
-#     fasta = bed.sequence(fi=fasta_path, s=True, name=True)
-    
-#     # Parse FASTA output
-#     with open(fasta.seqfn) as f:
-#         seq_lines = f.read().split(">")[1:]
-
-#     gc_by_id = {}
-#     for entry in seq_lines:
-#         header, seq = entry.strip().split("\n", 1)
-#         region_id = header.split()[0]
-#         sequence = seq.replace("\n", "").upper()
-#         gc_by_id[region_id] = gc_fraction(sequence)
-
-#     # Return aligned GC values
-#     return df["region_id"].map(gc_by_id)
-
-
 def run_pairplot_window(alu_dct, window, ks_test=False, cv=0, n_sample=0, inverted=False, display_dfs=False):
     """
     window: '5kb'
@@ -1011,22 +840,14 @@ def run_pairplot_window(alu_dct, window, ks_test=False, cv=0, n_sample=0, invert
     
     concat_pairs_df[["upstream_alu_len", "downstream_alu_len", "exon_len", 
                      "intra_alu_len", "alu1_end_to_alu2_start", "alu2_end_to_alu1_start"]] = (
-       add_alu_len_exon_len_cols(concat_pairs_df, pairs=True)) # XXX "alu1_end_to_alu2_start", "alu2_end_to_alu1_start" can we remove these cols downstream?
+       add_alu_len_exon_len_cols(concat_pairs_df, pairs=True))
     concat_inverted_pairs_df[["upstream_alu_len", "downstream_alu_len", "exon_len", 
                               "intra_alu_len", "alu1_end_to_alu2_start", "alu2_end_to_alu1_start"]] = (
-       add_alu_len_exon_len_cols(concat_inverted_pairs_df, pairs=True)) # XXX "alu1_end_to_alu2_start", "alu2_end_to_alu1_start" can we remove these cols downstream?
-    # new
+       add_alu_len_exon_len_cols(concat_inverted_pairs_df, pairs=True))
     concat_noninverted_pairs_df[["upstream_alu_len", "downstream_alu_len", "exon_len", 
                               "intra_alu_len", "alu1_end_to_alu2_start", "alu2_end_to_alu1_start"]] = (
-       add_alu_len_exon_len_cols(concat_noninverted_pairs_df, pairs=True)) # XXX "alu1_end_to_alu2_start", "alu2_end_to_alu1_start" can we remove these cols downstream?
+       add_alu_len_exon_len_cols(concat_noninverted_pairs_df, pairs=True))
     
-    # This section for intron_length and gc_content was added then removed....
-    # concat_pairs_df[["upstream_intron_length", "downstream_intron_length"]]             = add_intron_lengths(concat_pairs_df)
-    # concat_inverted_pairs_df[["upstream_intron_length", "downstream_intron_length"]]    = add_intron_lengths(concat_inverted_pairs_df)
-    # concat_noninverted_pairs_df[["upstream_intron_length", "downstream_intron_length"]] = add_intron_lengths(concat_noninverted_pairs_df)
-    #concat_pairs_df["gc_content"] = add_gc_content(concat_pairs_df)
-    #concat_inverted_pairs_df["gc_content"] = add_gc_content(concat_inverted_pairs_df)
-    #concat_noninverted_pairs_df["gc_content"] = add_gc_content(concat_noninverted_pairs_df)
 
     if display_dfs:
         cols_display = ["exon_chr", "exon_start", "exon_end", 
@@ -1034,7 +855,7 @@ def run_pairplot_window(alu_dct, window, ks_test=False, cv=0, n_sample=0, invert
                         "intra_alu_len", "alu1_end_to_alu2_start", "alu2_end_to_alu1_start",
                         "upstream_intron_length", "downstream_intron_length", 
                         "alu_span_GC_content", "intron_span_GC_content", 
-                        "up_alu_count", "down_alu_count"]  # XXX new and passed in
+                        "up_alu_count", "down_alu_count"]
         display(concat_pairs_df[cols_display].head())
         display(concat_inverted_pairs_df[cols_display].head())
         display(concat_noninverted_pairs_df[cols_display].head())
@@ -1068,8 +889,6 @@ def run_pairplot_window(alu_dct, window, ks_test=False, cv=0, n_sample=0, invert
                                window_size=window,
                                title="Inverted pairs", 
                                inversion="inverted")
-    # re-run and output 1 plot per cell to save
-    # re-run and save plot to file
 
 
 def plot_ks_result(ks_dct, window, cv=0, n_sample=0, ax=None, show_legend=True, ax_legend=None):
@@ -1087,7 +906,7 @@ def plot_ks_result(ks_dct, window, cv=0, n_sample=0, ax=None, show_legend=True, 
         pval_columns = [f'pval{i+1}' for i in range(cv)]
         negpval_columns = [f'neglog10pval{i+1}' for i in range(cv)]
         stat_columns = [f'stat{i+1}' for i in range(cv)]
-        #ks_df[pval_columns] = pd.DataFrame(ks_df['pval'].tolist(), index=ks_df.index) # 240423 added multiple testing correction
+        #ks_df[pval_columns] = pd.DataFrame(ks_df['pval'].tolist(), index=ks_df.index)
         pvals = ks_df['pval'].tolist()
         pvals_corrected = []
         for pval_list in pvals:
@@ -1159,13 +978,13 @@ def plot_ks_result(ks_dct, window, cv=0, n_sample=0, ax=None, show_legend=True, 
                            "alu_span_GC_content": "Alu span GC content",
                            "intron_span_GC_content": "Intron span GC content", 
                            "up_alu_count": "Upstream intron Alu count", 
-                           "down_alu_count": "Downstream intron Alu count"} # XXX new
+                           "down_alu_count": "Downstream intron Alu count"}
         feature_order = ["Upstream Alu length", "Downstream Alu length",
                          "Upstream Alu distance to exon", "Downstream Alu distance to exon",
                          "Upstream intron length", "Downstream intron length",
                          "Intra-Alu distance", "Exon length", 
                          "Alu span GC content", "Intron span GC content", 
-                         "Upstream intron Alu count", "Downstream intron Alu count"] # XXX new
+                         "Upstream intron Alu count", "Downstream intron Alu count"] 
         ks_df_melt["fixed_category"] = ks_df_melt["fixed_category"].map(category_mapping_subscripts)
         ks_df_melt["feature"] = ks_df_melt["feature"].map(feature_mapping)
         
@@ -1201,7 +1020,7 @@ def plot_ks_result(ks_dct, window, cv=0, n_sample=0, ax=None, show_legend=True, 
                       palette=selected_colors, dodge=True, alpha=0.6, legend=False, 
                       hue_order=feature_order, edgecolor="black", linewidth=0.1, ax=ax, size=1) #size=2, linewidth=0.25, edgecolor="black"
         if ax:
-            ax.axhline(-np.log10(0.05), ls='--', linewidth=0.5)  #XXX updated to -np.log10(0.05)
+            ax.axhline(-np.log10(0.05), ls='--', linewidth=0.5)
             ax.tick_params(axis='x', rotation=90, labelsize=fontsize_min, 
                            pad=tick_params_pad, length=tick_params_length, width=tick_params_width) #14
             ax.tick_params(axis='y', labelsize=fontsize_min, 
@@ -1221,11 +1040,11 @@ def plot_ks_result(ks_dct, window, cv=0, n_sample=0, ax=None, show_legend=True, 
             for spine in ax.spines.values():
                 spine.set_linewidth(0.25)
             
-            #fig = ax.get_figure() #XXX
-            #fig.tight_layout(rect=[0, 0, 0.98, 0.98]) #XXX left, bottom, right, top
+            #fig = ax.get_figure()
+            #fig.tight_layout(rect=[0, 0, 0.98, 0.98]) 
         
         if not ax:
-            ax1.axhline(-np.log10(0.05), ls='--')  #XXX updated to -np.log10(0.05)
+            ax1.axhline(-np.log10(0.05), ls='--')
             ax1.legend(title='', loc='upper center', bbox_to_anchor=(0.5, 1.25), #(0.5,1.12)
                       ncol=2, fancybox=True, shadow=False, borderaxespad=0.)
             plt.xticks(rotation=45, ha='right')
