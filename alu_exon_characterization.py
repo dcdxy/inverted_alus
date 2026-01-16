@@ -97,7 +97,7 @@ def generate_pairgrid_plot(df, cols, nrows_sample, window_size, title, inversion
     g.map_upper(sns.scatterplot, s=10, alpha=.2, rasterized=True)
     g.map_lower(sns.kdeplot)
     
-    g.fig.set_size_inches(10, 10)  # Set the desired width and height in inches
+    g.fig.set_size_inches(10, 10)
  
     g.add_legend(title='')
     g._legend.set_bbox_to_anchor((0.5, 0.98))
@@ -149,7 +149,6 @@ def generate_singlealu_pairgrid_plot(df, cols, nrows_sample, window_size, title)
     df_renamed = df.rename(columns=column_labels)
     pairgrid_pair_cols_renamed = [column_labels[col] for col in pairgrid_pair_cols]
     df_renamed['label'] = df_renamed['label'].map(label_col)
-    #display(df_renamed)
     
     g = sns.PairGrid(
         df_renamed[pairgrid_pair_cols_renamed].sample(n=10000, random_state=42), 
@@ -217,8 +216,8 @@ def run_ks_test(df1, df2_inverted, df3_noninverted, cv=0, n_sample=0):
             df1_constitutive             = df1[df1["label"] == "constitutive"].sample(n=n_sample, random_state=i)
             df2_inverted_skippable       = df2_inverted[df2_inverted["label"] == "skippable_inverted"].sample(n=n_sample, random_state=i)
             df2_inverted_constitutive    = df2_inverted[df2_inverted["label"] == "constitutive_inverted"].sample(n=n_sample, random_state=i)
-            df3_noninverted_skippable    = df3_noninverted[df3_noninverted["label"] == "skippable_noninverted"].sample(n=n_sample, random_state=i) # new
-            df3_noninverted_constitutive = df3_noninverted[df3_noninverted["label"] == "constitutive_noninverted"].sample(n=n_sample, random_state=i) # new
+            df3_noninverted_skippable    = df3_noninverted[df3_noninverted["label"] == "skippable_noninverted"].sample(n=n_sample, random_state=i)
+            df3_noninverted_constitutive = df3_noninverted[df3_noninverted["label"] == "constitutive_noninverted"].sample(n=n_sample, random_state=i)
     
             for col in pairgrid_pair_cols:
                 ks_res_skip = (
@@ -258,12 +257,12 @@ def run_ks_test(df1, df2_inverted, df3_noninverted, cv=0, n_sample=0):
                 ks_dct[col]["all"]["stat"].append(ks_res_all.statistic)
         return ks_dct
 
-    df1_skippable = df1[df1["label"] == "skippable"] #.sample(n=1000, random_state=1)
-    df1_constitutive = df1[df1["label"] == "constitutive"] #.sample(n=1000, random_state=1)
-    df2_inverted_skippable = df2_inverted[df2_inverted["label"] == "skippable_inverted"] #.sample(n=1000, random_state=1)
-    df2_inverted_constitutive = df2_inverted[df2_inverted["label"] == "constitutive_inverted"] #.sample(n=1000, random_state=1)
-    df3_noninverted_skippable = df3_noninverted[df3_noninverted["label"] == "skippable_noninverted"] #.sample(n=1000, random_state=1)
-    df3_noninverted_constitutive = df3_noninverted[df3_noninverted["label"] == "constitutive_noninverted"] #.sample(n=1000, random_state=1)
+    df1_skippable = df1[df1["label"] == "skippable"]
+    df1_constitutive = df1[df1["label"] == "constitutive"]
+    df2_inverted_skippable = df2_inverted[df2_inverted["label"] == "skippable_inverted"]
+    df2_inverted_constitutive = df2_inverted[df2_inverted["label"] == "constitutive_inverted"]
+    df3_noninverted_skippable = df3_noninverted[df3_noninverted["label"] == "skippable_noninverted"]
+    df3_noninverted_constitutive = df3_noninverted[df3_noninverted["label"] == "constitutive_noninverted"]
 
     print(f"len skippable: {len(df1_skippable)}")
     print(f"len constitutive: {len(df1_constitutive)}")
@@ -678,7 +677,6 @@ def run_pairplot_window(alu_dct, window, ks_test=False, cv=0, n_sample=0, invert
     constitutive_inverted_pairs_df = (
         add_label_col(alu_dct["constitutive_inverted"], "constitutive_inverted")
         )
-    # new
     skippable_noninverted_pairs_df = (
         add_label_col(alu_dct["skippable_noninverted"], "skippable_noninverted")
         )
@@ -759,7 +757,7 @@ def plot_ks_result(ks_dct, window, cv=0, n_sample=0, ax=None, show_legend=True, 
             pvals_corrected.append(bonferroni_corrected_p_values)
         ks_df[pval_columns] = pd.DataFrame(pvals_corrected, index=ks_df.index)
         ks_df[stat_columns] = pd.DataFrame(ks_df['stat'].tolist(), index=ks_df.index)
-        #display(ks_df)
+
         for pval_col in pval_columns:
             prob_temp = np.where(ks_df[pval_col] > 1.0e-10, ks_df[pval_col], 1.0e-10)
             ks_df[f"neglog10{pval_col}"] = -np.log10(prob_temp)
