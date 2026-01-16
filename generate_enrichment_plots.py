@@ -54,7 +54,6 @@ def generate_dfs_windows_subset(window,
                                 report_counts_only=False,
                                 discrete=False):
     """
-    Added 24-01-09 to filter out skipped/constitutive overlapping exons.
     Skippable_set and constitutive_set are the exon sets that we have set.
     Exon_db should be either hexevent or exonskipdb for the skipped_exon_df.
     
@@ -68,9 +67,7 @@ def generate_dfs_windows_subset(window,
     control_df: generally closest_const_exon_df which are the constitutive exons
     """
     w = window
-    #window_df = skipped_exon_df[skipped_exon_df['dist'].between(-w, w)].dropna(how='any')
-    #window_df = window_df.rename_axis('idx').reset_index().astype({'dist': 'int'})
-    
+
     # Skippable set can be from "hexevent" or "exonskipdb"
     hexevent_skipped_exon_df_subset = (
         remove_shared_exons(
@@ -174,25 +171,17 @@ def generate_contingency_table(r1c1, r1c2, r2c1, r2c2, r1_label, r2_label,
 
 
 def test_table_significance(table, alu=None, chi=True):
-    #oddsr, p = fisher_exact(table, alternative='two-sided') # two-sided, greater, less
     oddsr_less, p_less = fisher_exact(table, alternative='less')
     oddsr_greater, p_greater = fisher_exact(table, alternative='greater')
-    #chi2, chi_p, chi_dof, chi_expctd = chi2_contingency(table)
     stats_dct = {"fisher_greater_p": p_greater,
                  "fisher_less_p": p_less,
                  "fisher_odds_ratio_greater": oddsr_greater,
                  "fisher_odds_ratio_less": oddsr_less,
-                 #"fisher_p_value": p,
-                 #"fisher_odds_ratio": oddsr,
-                 #"chi2": chi2,
-                 #"chi_p_value": chi_p,
-                 #"dof": chi_dof,
-                 #"expected": np.around(chi_expctd),
                  "table": table,
                  "r1c1": table[0,0],
                  "r1c2": table[0,1],
                  "r2c1": table[1,0],
-                 "r2c2": table[1,1]}  # added r2c1, r2c2
+                 "r2c2": table[1,1]}
     if chi:
         chi2, chi_p, chi_dof, chi_expctd = chi2_contingency(table)
         stats_dct["chi_p_value"] = chi_p
@@ -211,13 +200,9 @@ def test_table_across_windows(flank_df, control_flank_df,
     
     # Specific case: alu=False, pair=False, inverted=False, comb=False (IR vs non-IR; all subfamilies together)
     """
-    # Also generate dictionaries?
     r1c1 = len(ir_flank_df)
     r1c2 = len(control_ir_flank_df)
-    
-    #r2c1 = len(flank_df) - len(ir_flank_df)
-    #r2c2 = len(control_flank_df) - len(control_ir_flank_df)
-    
+        
     non_ir_flank_df = filter_non_inverted_pair(flank_df.copy())
     control_non_ir_flank_df = filter_non_inverted_pair(control_flank_df.copy())
     r2c1 = len(non_ir_flank_df) # number of Alu pairs with at least 1 flanking non-IR Alu pair
@@ -240,13 +225,7 @@ def test_table_across_windows_exon(flank_df, control_flank_df,
     """
     r1c1 = len(groupby_exons(ir_flank_df)) # number of exons with at least 1 flanking IR Alu pair
     r1c2 = len(groupby_exons(control_ir_flank_df)) # number of exons with at least 1 flanking IR Alu pair
-    
-    # change this -- don't subtract from total, instead calculate separately (so there will be double-counting
-    # between skipped and constitutive sets
-    #r2c1 = len(groupby_exons(flank_df)) - len(groupby_exons(ir_flank_df)) # previously; biased towards IR Alus
-    #r2c2 = len(groupby_exons(control_flank_df)) - len(groupby_exons(control_ir_flank_df))
-    
-    # Added on 23-01-19
+        
     non_ir_flank_df = filter_non_inverted_pair(flank_df.copy())
     control_non_ir_flank_df = filter_non_inverted_pair(control_flank_df.copy())
     r2c1 = len(groupby_exons(non_ir_flank_df)) # number of exons with at least 1 flanking non-IR Alu pair
@@ -267,7 +246,6 @@ def bar_plot_subfamilies(stats_df, window, r1c1_label, r1c2_label, title):
     stats_df = stats_df.sort_values(by=['r1c2'], ascending=False)
     stats_idx = list(stats_df.set_index('alu_subfamily').index)
     
-    #bonferroni_reject_list = stats_df[stats_df['bonferroni_reject']]['alu_subfamily'].tolist()
     bonferroni_reject_greater = stats_df[stats_df['bonferroni_reject_greater']]['alu_subfamily'].tolist()
     bonferroni_reject_less = stats_df[stats_df['bonferroni_reject_less']]['alu_subfamily'].tolist()
     bonferroni_reject = stats_df[stats_df['bonferroni_reject_less'] | stats_df['bonferroni_reject_greater']]['alu_subfamily'].tolist()
@@ -290,7 +268,6 @@ def bar_plot_subfamilies(stats_df, window, r1c1_label, r1c2_label, title):
                                                            color=[color_dict.get(x, normal_color) for x in stats_idx],
                                                            label=r1c1_label)
     for idx,p in enumerate(ax1.patches):
-        #if idx in [window_idx.index(x) for x in bonferroni_reject_list]:
         if idx in [stats_idx.index(x) for x in bonferroni_reject_greater]:
             ax.annotate('{:0.2e}'.format(stats_df[stats_df['alu_subfamily'] == stats_idx[idx]]["bonferroni_p_greater"].tolist()[0]),
                         (p.get_x() * 1.005, (p.get_height()+1) * 1.02), rotation=45)  #str(p.get_height()) #+1, *1.005
@@ -312,7 +289,7 @@ def bar_plot_subfamilies(stats_df, window, r1c1_label, r1c2_label, title):
     plt.show()
 
 
-def print_and_plot(stats_df, window, r1c1_label, r1c2_label, title, plot=True):  # added plot=True
+def print_and_plot(stats_df, window, r1c1_label, r1c2_label, title, plot=True):
     """
     (1) Apply Bonferroni correction
     (2) Plot p-values (histogram)
@@ -324,7 +301,7 @@ def print_and_plot(stats_df, window, r1c1_label, r1c2_label, title, plot=True): 
     """
     stats_df['bonferroni_reject_greater'], stats_df['bonferroni_p_greater'],_,_ = multipletests(stats_df['fisher_greater_p'], method='bonferroni')
     stats_df['bonferroni_reject_less'], stats_df['bonferroni_p_less'],_,_ = multipletests(stats_df['fisher_less_p'], method='bonferroni')
-    #hist_p_vals(stats_df)
+
     if plot:
         bar_plot_subfamilies(stats_df, window, r1c1_label, r1c2_label, title)
     return stats_df
@@ -356,14 +333,11 @@ def test_table_across_windows_subfamily(window, flank_df, control_flank_df, ir_f
                 r1c1 = len(ir_flank_df_single_alu)
                 r1c2 = len(control_ir_flank_df_single_alu)
                 
-                #r2c1 = len(ir_flank_df) - len(ir_flank_df_single_alu)  # previously 
                 r2c1 = len(non_ir_flank_df_single_alu)
-                #r2c2 = len(control_ir_flank_df) - len(control_ir_flank_df_single_alu)  # previously
                 r2c2 = len(control_non_ir_flank_df_single_alu)
                 
                 result_dct = generate_contingency_table(r1c1, r1c2, r2c1, r2c2,
                                                         r1_label="Inverted pair & 1+ {}".format(ind_alu),
-                                                        #r2_label="Inverted pair & {} not in pair".format(ind_alu),
                                                         r2_label="Non-inverted pair & 1+ {}".format(ind_alu),
                                                         alu=ind_alu, chi=False)
                 stats_dct_list1.append(result_dct)
@@ -444,7 +418,6 @@ def run_across_windows(hexevent_skipped_exon_df,
         print(plot_dct[window])
         results1 = None
     
-    #return {k: v for d in results for k, v in d.items()}
     return results, plot_dct
 
 
@@ -495,7 +468,6 @@ def run_subfamily_enrichment(df_skip_hex, df_skip_esdb, df_const, exon_sets, pai
     
     results_df_singlealuirpair_df = pd.concat(results, ignore_index=True)
     return results, plot_dct, results_df_singlealuirpair_df
-    #swarmplot_p_values(results_df_singlealuirpair_df, title=None, log=False)
 
 
 def run_across_windows_subfamilies(skipped_exon_df: pd.DataFrame,
@@ -616,8 +588,6 @@ def test_table(window, flank_df, control_flank_df,
     -pair: set True if want to compare pairs of Alu subfamilies, otherwise (single member of pair) leave default: False
     -inverted: set True if Alu member/pair should be inverted
     """
-    #window_df = closest_exon_df[closest_exon_df['dist'].between(-window, window)].dropna(how='any')  # dropna doesn't change anything once window is applied
-    #window_df = window_df.rename_axis('idx').reset_index().astype({'dist': 'int'})
     window_df_counts = window_df['alu_subfamily'].value_counts()
     
     # if no flags are set (alu, pair, inverted): IR vs non-IR (all subfamilies together)
@@ -640,11 +610,8 @@ def test_table(window, flank_df, control_flank_df,
         if (inverted == False) and (pair == False) and (comb == False): #single member
             stats_dct_list = []
             for ind_alu in list(set(window_df_counts.index)):
-                # Replace with function on 23-12-11
                 flank_df_single_alu = filter_inclusion_alu_single(flank_df, ind_alu)
                 control_flank_df_single_alu = filter_inclusion_alu_single(control_flank_df, ind_alu)
-                #flank_df_single_alu = flank_df[(flank_df['upstream_alu_subfamily'] == ind_alu) | (flank_df['downstream_alu_subfamily'] == ind_alu)]
-                #control_flank_df_single_alu = control_flank_df[(control_flank_df['upstream_alu_subfamily'] == ind_alu) | (control_flank_df['downstream_alu_subfamily'] == ind_alu)]
 
                 r1c1 = len(flank_df_single_alu)
                 r1c2 = len(control_flank_df_single_alu)
@@ -679,7 +646,6 @@ def test_table(window, flank_df, control_flank_df,
                 r2c2 = len(control_non_ir_flank_df_single_alu)
                 result_dct = generate_contingency_table(r1c1, r1c2, r2c1, r2c2,
                                                         r1_label="Inverted pair & 1+ {}".format(ind_alu),
-                                                        #r2_label="Inverted pair & {} not in pair".format(ind_alu),  # previous
                                                         r2_label="Non-inverted pair & 1+ {}".format(ind_alu),
                                                         alu=ind_alu, chi=False)
                 stats_dct_list1.append(result_dct)
@@ -797,7 +763,6 @@ def test_table(window, flank_df, control_flank_df,
             result_dct_list3 = []
             for alu_pair in list(combinations(list(set(window_df_counts.index)),2)):
                 
-                # Replaced long chained statements below with function on 23-12-08
                 flank_df_alu_pair = filter_inclusion_alu_pair(flank_df, alu_pair)
                 control_flank_df_alu_pair = filter_inclusion_alu_pair(control_flank_df, alu_pair)
                 ir_flank_df_alu_pair = filter_inclusion_alu_pair(ir_flank_df, alu_pair)
@@ -832,7 +797,6 @@ def test_table(window, flank_df, control_flank_df,
             results_df2 = pd.DataFrame(result_dct_list2)
             results_df3 = pd.DataFrame(result_dct_list3)
             
-            #stats_df1 = pd.DataFrame(stats_dct_list1)
             plot1_r1c1_label = "Flanking skipped exons"
             plot1_r1c2_label = "Flanking constitutive exons"
             plot1_title = ("Alu pair in inverted pair vs " +
@@ -840,9 +804,9 @@ def test_table(window, flank_df, control_flank_df,
             results_df3 = print_and_plot(results_df3, window, plot1_r1c1_label, plot1_r1c2_label, plot1_title, plot=False)
             
             plot_alu_pairs_combo(results_df, window, title="Alu pairs")
-            return results_df3  # previously results_df2
+            return results_df3
     
-    bonferroni_significant_p = 0.05/51  #usually alpha/n_tests == 0.05/51 but repeated twice (less and greater)
+    bonferroni_significant_p = 0.05/51
     print("Bonferroni significant p-value for one-tailed tests across Alu subfamilies: {:0.2e}".format(bonferroni_significant_p))
     bonferroni_significant_p_two = 0.05/(51*2)  #usually alpha/n_tests == 0.05/51 but repeated twice (less and greater)
     print("Bonferroni significant p-value for 2*one-tailed tests across Alu subfamilies: {:0.2e}".format(bonferroni_significant_p_two))
@@ -855,7 +819,7 @@ def plot_alu_pairs_combo(results_df: pd.DataFrame, window: str, title: str):
     ax.set_xlabel("Alu subfamily pair combinations")
     ax.set_ylabel("Frequency")
     
-    results_df = results_df.copy().sort_values(by=['flank'], ascending=False)  # added copy
+    results_df = results_df.copy().sort_values(by=['flank'], ascending=False)
     results_idx = list(results_df.set_index('pair').index)
             
     ax1 = (results_df.head(100)
@@ -882,19 +846,6 @@ def plot_alu_pairs_combo(results_df: pd.DataFrame, window: str, title: str):
 
 
 def generate_melt_df_for_enrichment_plot(enrichment_dct):
-    #r1c1 = len(ir_flank_df)
-    #r1c2 = len(control_ir_flank_df)
-    #r2c1 = len(flank_df) - len(ir_flank_df)
-    #r2c2 = len(control_flank_df) - len(control_ir_flank_df)
-    
-    # df_melt = pd.melt(pd.DataFrame.from_dict(enrichment_dct, orient="index")
-    #                   .reset_index()
-    #                   .rename(columns={"index": "window",
-    #                                    "r1c1": "Inverted flanking skippable",
-    #                                    "r1c2": "Inverted flanking constitutive",
-    #                                    "r2c1": "Non-inverted flanking skippable",
-    #                                    "r2c2": "Non-inverted flanking constitutive"}),
-    #                   id_vars=["window", "log10p"], var_name="group")
     df_premelt = (pd.DataFrame
                   .from_dict(enrichment_dct, orient="index")
                   .reset_index()
@@ -964,18 +915,12 @@ def generate_enrichment_plot(df_melt, ylabel, xlabel=False, legend=True, ax_lege
     ax2.set_ylabel('-log10(p_adj)', color='g', fontsize=fontsize_min, labelpad=axis_label_pad)
     handles, labels = ax1.get_legend_handles_labels()
 
-    ##ax1.legend(handles=handles[0:], labels=labels[0:], bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-    # ref: https://stackoverflow.com/questions/4700614
-    #ax1.legend(loc='lower center', bbox_to_anchor=(0.5, -0.30), #-0.25
-    #      ncol=2, fancybox=True, shadow=False, borderaxespad=0.)
     if legend:
         if legend_pos == "right":
             ax1.legend(loc='lower center', bbox_to_anchor=(0.8, 0.77), #-0.25
                        ncol=1, fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)
         else:
             if ax_legend:
-                #ax_legend.legend(loc='lower center', bbox_to_anchor=(0.5, -0.1), #bbox_to_anchor=(0.27, 0.55)
-                #       ncol=2, fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)
                 ax_legend.legend(handles, labels, loc='center', bbox_to_anchor=(0.5, 0.1),
                                  ncol=2, fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)
                 ax_legend.axis('off')
@@ -983,8 +928,6 @@ def generate_enrichment_plot(df_melt, ylabel, xlabel=False, legend=True, ax_lege
             else:
                 ax1.legend(loc='lower center', bbox_to_anchor=(1, 0.55), #bbox_to_anchor=(0.27, 0.55)
                        ncol=2, fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)
-            #ax1.legend(loc='lower center', bbox_to_anchor=(0.27, 0.55), #(0.23, 0.62) for font_scale=1.2 #-0.25
-            #           ncol=1, fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)
     else:
         ax1.get_legend().remove()
     
@@ -1013,9 +956,6 @@ def generate_enrichment_plot(df_melt, ylabel, xlabel=False, legend=True, ax_lege
         spine.set_linewidth(0.25)
     for spine in ax2.spines.values():
         spine.set_linewidth(0.25) 
-
-    #plt.title(f"{title}")
-    #plt.show()
 
 
 def swarmplot_p_values(results_df, title=None, log=False, use_string=False, 
@@ -1070,8 +1010,6 @@ def swarmplot_p_values(results_df, title=None, log=False, use_string=False,
     
     if ylabel:
         if log:
-            #ax.set_yscale('log')
-            #ax.set_ylabel("Bonferroni-corrected p-value \n(alternative: greater)") # log(bonferroni_p_greater)
             ax.set_ylabel("-log10(p_adj)", fontsize=fontsize_min) # log(bonferroni_p_greater)
         else:
             ax.set_ylabel("Bonferroni-corrected p-value \n(alternative: greater)", fontsize=fontsize_min)
@@ -1091,9 +1029,6 @@ def swarmplot_p_values(results_df, title=None, log=False, use_string=False,
                       ncol=5, fancybox=True, shadow=False, borderaxespad=0., 
                       fontsize=fontsize_min, title="Window (bp)")
         elif legend_pos == "right":
-            # ax.legend(loc='lower center', bbox_to_anchor=(1.24, -0.1), # (1.21, 0.1),(1.13, 0.1)
-            #           ncol=1, fancybox=True, shadow=False, borderaxespad=0., 
-            #           fontsize=fontsize_min, title="Window (bp)", title_fontsize=fontsize_min)
             ax_legend.legend(handles, labels, loc='center', bbox_to_anchor=(0.5, 0.5),
                              ncol=5, fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min, #ncol=10
                              title="Window (bp)", title_fontsize=fontsize_min, 
@@ -1112,7 +1047,6 @@ def swarmplot_p_values(results_df, title=None, log=False, use_string=False,
 
     for spine in ax.spines.values():
         spine.set_linewidth(0.25)
-    #plt.show()
 
 
 def plot_or(df, ax=None):
