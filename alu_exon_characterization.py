@@ -450,7 +450,7 @@ def generate_violin_plot_multi(df_all, df_inv, df_noninv, window_size, title, y_
     df_noninv["hue_label"] = "Non-inv"
     
     df_plot = pd.concat([df_all, df_inv, df_noninv], axis=0, ignore_index=True)
-    #print(f"df_all: {df_all.shape}, df_inv: {df_inv.shape}, df_noninv: {df_noninv.shape}, df_plot: {df_plot.shape}")
+
     # Define conditions and corresponding values
     conditions = [
         df_plot['label'].isin(["skippable", "skippable_inverted", "skippable_noninverted"]),
@@ -593,11 +593,10 @@ def generate_histogram_multi(df, window_size, title, legend, ylabel, ax=None, zo
                    length=tick_params_length, width=tick_params_width, pad=tick_params_pad)
 
     df = df.copy()
-    df["upstream_dist"]   = -df["upstream_dist"].abs()  # Make upstream distances negative
-    df["downstream_dist"] = df["downstream_dist"].abs()  # Ensure downstream distances are positive
+    df["upstream_dist"]   = -df["upstream_dist"].abs()
+    df["downstream_dist"] = df["downstream_dist"].abs()
     df_melted = pd.melt(df, id_vars=['label'], value_vars=['upstream_dist', 'downstream_dist'], 
                         value_name='distance')
-    #print(df_melted.columns)
     
     label_mapping = {"skippable_inverted": "Skippable",
                      "skippable_noninverted": "Skippable",
@@ -634,7 +633,7 @@ def generate_histogram_multi(df, window_size, title, legend, ylabel, ax=None, zo
         sns.move_legend(ax, loc="center right", bbox_to_anchor=(0.985, 0.9), #(1.26, 0.5)
                         ncol=1, title='', fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)
     elif legend and legend_pos=="single":
-        sns.move_legend(ax, loc="upper center", bbox_to_anchor=(0.5, 1.15),  # Adjust y-position as needed
+        sns.move_legend(ax, loc="upper center", bbox_to_anchor=(0.5, 1.15),
                         ncol=2, title='', fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)
 
     for spine in ax.spines.values():
