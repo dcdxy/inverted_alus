@@ -36,9 +36,6 @@ def add_alu_len_exon_len_cols(df, pairs):
         df["upstream_alu_len"]  = df["upstream_alu_len"].abs()
         df["downstream_alu_len"]  = df["downstream_alu_end"] - df["downstream_alu_start"]
         df["downstream_alu_len"]  = df["downstream_alu_len"].abs()
-        #df["dist1"] = df["downstream_alu_start"] - df["upstream_alu_end"]
-        #df["dist2"] = df["upstream_alu_start"] - df["downstream_alu_end"]
-        #df["intra_alu_len"] = df[["dist1", "dist2"]].abs().min(axis=1)
         df["intra_alu_len"] = df.apply(calc_intra_dist, axis=1)
         assert (df["intra_alu_len"].dropna() > 0).all(), "Some intra_alu_len values are not positive!"
         df["dist1"] = 0
@@ -52,8 +49,6 @@ def add_alu_len_exon_len_cols(df, pairs):
 
 
 def generate_pairgrid_plot(df, cols, nrows_sample, window_size, title, inversion):
-    #pairgrid_pair_cols = ["upstream_alu_len", "downstream_alu_len", "exon_len", 
-    #                      "upstream_dist", "downstream_dist", "label"]
     pairgrid_pair_cols = cols
     
     df = df.copy()
@@ -101,33 +96,8 @@ def generate_pairgrid_plot(df, cols, nrows_sample, window_size, title, inversion
     g.map_diag(sns.histplot, rasterized=True) 
     g.map_upper(sns.scatterplot, s=10, alpha=.2, rasterized=True)
     g.map_lower(sns.kdeplot)
-
-    #for ax in g.axes.flatten():
-    #    if hasattr(ax, 'collections'):
-    #        for col in ax.collections:
-    #            col.set_rasterized(True)
-    
-    # def plot_diag(x, **kws):
-    #     label = kws.pop('label', None)
-    #     sns.histplot(x, **kws, zorder=1 if label == hue_order[0] else 2)
-
-    # def plot_upper(x, y, **kws):
-    #     label = kws.pop('label', None)
-    #     sns.scatterplot(x=x, y=y, **kws, s=10, alpha=.2, zorder=1 if label == hue_order[0] else 2)
-
-    # def plot_lower(x, y, **kws):
-    #     label = kws.pop('label', None)
-    #     sns.kdeplot(x=x, y=y, **kws, zorder=1 if label == hue_order[0] else 2)
-
-
-    # g.map_diag(plot_diag)
-    # g.map_upper(plot_upper)
-    # g.map_lower(plot_lower)
     
     g.fig.set_size_inches(10, 10)  # Set the desired width and height in inches
-
-    #g.map_offdiag(sns.scatterplot) 
-    #g.map_diag(sns.kdeplot)
  
     g.add_legend(title='')
     g._legend.set_bbox_to_anchor((0.5, 0.98))
@@ -148,8 +118,6 @@ def generate_pairgrid_plot(df, cols, nrows_sample, window_size, title, inversion
 
 
 def generate_singlealu_pairgrid_plot(df, cols, nrows_sample, window_size, title):
-    #pairgrid_pair_cols = ["upstream_alu_len", "downstream_alu_len", "exon_len", 
-    #                      "upstream_dist", "downstream_dist", "label"]
     pairgrid_pair_cols = cols
     
     # map labels
@@ -218,10 +186,12 @@ def jitter(values, j):
     """
     return values + np.random.normal(j,0.1,values.shape)
 
+
 def run_ks_2sample_test_2sided(df1, df2, col):
     """Updated to "mask" NaN values by using nan_policy="omit". That way we don't have to filter out exons completely.
     """
     return ks_2samp(df1[col], df2[col], alternative="two-sided", method="auto", nan_policy="omit")  # updated to use nan_policy="omit" to handle NaN values
+
 
 def run_ks_test(df1, df2_inverted, df3_noninverted, cv=0, n_sample=0):
     """
@@ -286,21 +256,6 @@ def run_ks_test(df1, df2_inverted, df3_noninverted, cv=0, n_sample=0):
                 ks_dct[col]["noninverted"]["stat"].append(ks_res_noninv.statistic)
                 ks_dct[col]["all"]["pval"].append(ks_res_all.pvalue)
                 ks_dct[col]["all"]["stat"].append(ks_res_all.statistic)
-                # ks_res_skip = ks_2samp(df1_skippable[col],
-                #                  df2_inverted_skippable[col],
-                #                  alternative="two-sided", method="auto")
-
-                # ks_res_cons = ks_2samp(df1_constitutive[col],
-                #                         df2_inverted_constitutive[col],
-                #                         alternative="two-sided", method="auto")
-
-                # ks_res_inv = ks_2samp(df2_inverted_skippable[col],
-                #                     df2_inverted_constitutive[col],
-                #                     alternative="two-sided", method="auto")
-
-                # ks_res_all = ks_2samp(df1_skippable[col],
-                #                     df1_constitutive[col],
-                #                     alternative="two-sided", method="auto")
         return ks_dct
 
     df1_skippable = df1[df1["label"] == "skippable"] #.sample(n=1000, random_state=1)
@@ -374,11 +329,7 @@ def run_ks_test(df1, df2_inverted, df3_noninverted, cv=0, n_sample=0):
 
         if col == "exon_len":  #downstream_dist
             print(list(df1_skippable[col])[0:10])
-            print(list(df2_inverted_skippable[col])[0:10])
-            #df_skippable = pd.DataFrame.from_dict({"downstream_distance": sorted(list(df1_skippable[col])),
-            #                                       "downstream_distance_inverted": sorted(list(df2_inverted_skippable[col]))},
-            #                                      orient="index")
-            
+            print(list(df2_inverted_skippable[col])[0:10])            
             df_skippable = pd.DataFrame.from_dict({"exon_len": sorted(list(df1_skippable[col])),
                                                    "exon_len_inv": sorted(list(df2_inverted_skippable[col]))},
                                                   orient="index")
@@ -434,20 +385,12 @@ def plot_exon_length(alu_dct, window, exon_distance=False, y_col="exon_len", zoo
         ["upstream_alu_len", "downstream_alu_len", "exon_len",
          "intra_alu_len", "alu1_end_to_alu2_start", "alu2_end_to_alu1_start"]
         ] = (add_alu_len_exon_len_cols(concat_noninverted_pairs_df, pairs=True))
-    
-    #subset_df = df[df['type'].isin(['skippable', 'const'])]
-    # generate_violin_plot(df=concat_pairs_df[concat_pairs_df["label"].isin(["skippable", "constitutive"])], 
-    #                      window_size=window, title="All", fill_colour="lightgrey")
-    # generate_violin_plot(df=concat_inverted_pairs_df, #[concat_pairs_df["label"].isin(["skippable_inverted", "constitutive_inverted"])], 
-    #                      window_size=window, title="Inverted", fill_colour="steelblue")
-    # generate_violin_plot(df=concat_noninverted_pairs_df, #[concat_pairs_df["label"].isin(["skippable_noninverted", "constitutive_noninverted"])], 
-    #                      window_size=window, title="Non-inverted", fill_colour="orange")
-    
+        
     if not exon_distance:
         generate_violin_plot_multi(
             df_all=concat_pairs_df[concat_pairs_df["label"].isin(["skippable", "constitutive"])],
             df_inv=concat_inverted_pairs_df,
-            df_noninv=concat_noninverted_pairs_df, #[concat_pairs_df["label"].isin(["skippable_noninverted", "constitutive_noninverted"])], 
+            df_noninv=concat_noninverted_pairs_df,
             window_size=window, 
             title="",
             y_col=y_col,
@@ -456,24 +399,22 @@ def plot_exon_length(alu_dct, window, exon_distance=False, y_col="exon_len", zoo
             ax=ax)
     
     if exon_distance:
-        #generate_histogram(df=concat_pairs_df[concat_pairs_df["label"].isin(["skippable", "constitutive"])],
-        #                   window_size=window, title="All")
         if inv == "inverted" and show_title == True:
-            generate_histogram_multi(df=concat_inverted_pairs_df, #[concat_pairs_df["label"].isin(["skippable_inverted", "constitutive_inverted"])], 
+            generate_histogram_multi(df=concat_inverted_pairs_df,
                                      window_size=window, title="Inverted", 
                                      legend=False, ylabel=True, ax=ax, zoom=zoom, show_title=show_title)
         elif inv == "inverted" and show_title == False: #this one for combined plot
-            generate_histogram_multi(df=concat_inverted_pairs_df, #[concat_pairs_df["label"].isin(["skippable_inverted", "constitutive_inverted"])], 
+            generate_histogram_multi(df=concat_inverted_pairs_df,
                                      window_size=window, title="Inverted", 
                                      legend=True, ylabel=True, ax=ax, 
                                      zoom=zoom, show_title=show_title, 
                                      legend_pos="single")
         elif inv == "non-inverted" and show_title==True:
-            generate_histogram_multi(df=concat_noninverted_pairs_df, #[concat_pairs_df["label"].isin(["skippable_noninverted", "constitutive_noninverted"])], 
+            generate_histogram_multi(df=concat_noninverted_pairs_df,
                                      window_size=window, title="Non-inverted", 
                                      legend=True, ylabel=False, ax=ax, zoom=zoom, show_title=show_title)
         elif inv == "non-inverted" and show_title==False:
-            generate_histogram_multi(df=concat_noninverted_pairs_df, #[concat_pairs_df["label"].isin(["skippable_noninverted", "constitutive_noninverted"])], 
+            generate_histogram_multi(df=concat_noninverted_pairs_df,
                                      window_size=window, title="Non-inverted", 
                                      legend=True, ylabel=True, ax=ax, 
                                      zoom=zoom, show_title=show_title, 
@@ -505,10 +446,6 @@ def generate_violin_plot_multi(df_all, df_inv, df_noninv, window_size, title, y_
     orange="#EE7733"
     light_orange="#EEC5AE"
 
-    # df_all["hue_label"] = "All"
-    # df_inv["hue_label"] = "Inverted"
-    # df_noninv["hue_label"] = "Non-inverted"
-    ##hue_order = ["Inverted", "Non-inverted", "All"]
     df_all["hue_label"] = "Inv and\nNon-inv"
     df_inv["hue_label"] = "Inv"
     df_noninv["hue_label"] = "Non-inv"
@@ -548,16 +485,6 @@ def generate_violin_plot_multi(df_all, df_inv, df_noninv, window_size, title, y_
             ax.set_ylim(-20, 15000)
             ax.set_yticks(np.arange(0, 30001, 2500)) #15001
             ax.set_ylabel("Downstream \nintron length (bp)", fontsize=fontsize_min, labelpad=axis_label_pad)
-
-    #ax.set_ylim(-20, 350)
-    #ax.set_yticks(np.arange(0, 351, 50))
-    
-    # if y_col == "exon_len":
-    #     cut_lim = 350
-    # elif y_col == "downstream_intron_length":
-    #     cut_lim = 15000
-    # else:
-    #     cut_lim = 1000
     
     if plot_type == "violin":
         df_plot["log_y"] = np.log10(df_plot[y_col] + 1)
@@ -570,20 +497,12 @@ def generate_violin_plot_multi(df_all, df_inv, df_noninv, window_size, title, y_
             n1 = len(group1.dropna())
             n2 = len(group2.dropna())
             mannu_result = mannwhitneyu(group1, group2, alternative='less', nan_policy="omit")
-            #if hue_l == "Inv and\nNon-inv":
-            #    print(f"Comparing Skippable vs Constitutive for Inv and Non-inv")
-            #else:
-            #    print(f"Comparing Skippable vs Constitutive for {hue_l}")
-            #print(f"Group 1: {group1.describe()}")
-            #print(f"Group 2: {group2.describe()}")
-            #print(f"Mann-Whitney U test for {hue_l}: {group1.name} vs {group2.name}")
-            #print(f"U-statistic: {mannu_result.statistic}, alt=less p-value: {mannu_result.pvalue}, effect size: {mannu_result.statistic / (n1*n2)}\n")
 
         sns.violinplot(
             x='hue_label',
-            y="log_y",  # y=y_col
-            data=df_plot,  # showcaps=False,
-            hue="group",  # hue_order
+            y="log_y",
+            data=df_plot,
+            hue="group",
             order=["Inv", "Non-inv", "Inv and\nNon-inv"],
             palette=[blue, orange],
             linewidth=0.25,
@@ -592,16 +511,12 @@ def generate_violin_plot_multi(df_all, df_inv, df_noninv, window_size, title, y_
             bw_adjust=1,
             split=True,
             cut=0,
-            gap=0.2, 
-            # inner="quart",
-            #inner="stick",
-            #log_scale=True,
+            gap=0.2,
             ax=ax
         )
         ticks = [1, 10, 100, 1000, 10000, 100000]
         ax.set_yticks(np.log10(ticks))
         ax.set_yticklabels([str(t) for t in ticks], fontsize=fontsize_min)
-        #ax.set_ylim(top=np.log10(999999)) 
         ax.tick_params(axis='y', labelsize=fontsize_min)
         ax.set_ylabel(y_col, fontsize=fontsize_min)
 
@@ -612,40 +527,13 @@ def generate_violin_plot_multi(df_all, df_inv, df_noninv, window_size, title, y_
             ax.set_ylabel("log10(Downstream \nintron length (bp))", fontsize=fontsize_min, labelpad=axis_label_pad)
             ax.set_ylim(bottom=1.5)
             ax.set_ylim(top=5.9)
-        # log_ticks = np.log10([1, 10, 100, 1000, 10000, 100000])
-        # ax.set_yticks(log_ticks)
-        # ax.set_yticklabels([f"{t:,}" for t in [1, 10, 100, 1000, 10000, 100000]])
-
-    # sns.histplot(
-    #     data=df_plot[df_plot["hue_label"] == "Inv"],
-    #     x=y_col,
-    #     hue="group",
-    #     multiple="dodge",     # bar groups side by side
-    #     bins=30,              # or specify manually
-    #     palette=[blue, orange],
-    #     log_scale=(True, False),  # log scale for x-axis only
-    #     ax=ax
-    # )
 
     ax.set_xlabel("")  # Window
-    #ax.set_ylabel("Exon length (bp)", fontsize=fontsize_min, labelpad=axis_label_pad)
 
     ax.tick_params(axis='x', rotation=90, labelsize=fontsize_min, 
                    length=tick_params_length, width=tick_params_width, pad=tick_params_pad)
     ax.tick_params(axis='y', labelsize=fontsize_min, 
                    length=tick_params_length, width=tick_params_width, pad=tick_params_pad)
-    
-    # if show_legend:
-    #     # ax.legend(title='', loc='upper center', bbox_to_anchor=(0.5, 1.25), 
-    #     #           ncol=1, fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)
-    #     #ax.legend(title='', loc='lower center', bbox_to_anchor=(0.5, -1.25),
-    #     #          ncol=1, fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)
-    #     handles, labels = ax.get_legend_handles_labels()  # new 2025-08-18
-    #     ax.get_legend().remove()  # new
-    #     return handles, labels
-    # else:
-    #     ax.get_legend().remove()
-    #     return None, None  # new
 
     for spine in ax.spines.values():
         spine.set_linewidth(0.25)
@@ -654,44 +542,24 @@ def generate_violin_plot_multi(df_all, df_inv, df_noninv, window_size, title, y_
         plt.show()
         
     if show_legend:
-        #print("showing legend")
-        handles, labels = ax.get_legend_handles_labels()  # new 2025-08-18
-        #ax.get_legend().remove()  # new
+        handles, labels = ax.get_legend_handles_labels()
         return handles, labels
     else:
-        #print("not showing legend")
         legend = ax.get_legend()
         if legend:
             legend.remove()
-        return None, None  # new
-    
-    #plt.title(f'{title}: {window_size}')
-    #plt.xlabel('Category')
-    #plt.ylabel('Exon length (bp)')
-    #plt.xticks(rotation=45, ha='center')
-    #plt.ylim(-20,400)
-
-    #plt.legend(title='', loc='upper right', bbox_to_anchor=(1, 1))
-    #plt.legend(title='', loc='center left', bbox_to_anchor=(1, 0.5))
-    #plt.legend(title='', ncol=2, loc='upper center', bbox_to_anchor=(0.5, 1.1))
-    #plt.xlabel("")
-    #plt.show()
+        return None, None
 
 
 def generate_violin_plot(df, window_size, title, fill_colour):
     print(df.head())
     plt.figure(figsize=(3, 6))
-    #sns.violinplot(x='label', y='exon_len', data=df)
-    # sns.stripplot(x='label', y='exon_len', data=df, jitter=True, color='black', alpha=0.5)
     sns.boxplot(x='label', y='exon_len', data=df, showcaps=False, boxprops={'facecolor': fill_colour}, 
                  showfliers=False, whiskerprops={'linewidth': 2})
-    #sns.kdeplot(data=df, x="exon_len", hue="label", fill=True, color="blue")
     plt.title(f'{title}: {window_size}')
     plt.xlabel('Category')
     plt.ylabel('Exon Length (bp)')
     plt.xticks(rotation=45, ha='center')
-    #plt.yscale('log') 
-    #plt.xscale("log")
     plt.show()
 
 
@@ -763,18 +631,10 @@ def generate_histogram_multi(df, window_size, title, legend, ylabel, ax=None, zo
         ax.set_title("")
     ax.get_yaxis().set_major_formatter(mpl.ticker.StrMethodFormatter('{x:,.0f}'))
 
-    # ax.set_xticklabels(ax.get_xticklabels(), fontsize=fontsize_min)
-    # ax.set_yticklabels(ax.get_yticklabels(), fontsize=fontsize_min)
-    # ax.tick_params(axis='both', which='both', length=1, pad=2)
-
     if legend and not legend_pos:
-        #sns.move_legend(ax, loc="lower center", bbox_to_anchor=(0.5, -0.5), 
-        #            ncol=2, title='', fancybox=True, shadow=False, borderaxespad=0.)
         sns.move_legend(ax, loc="center right", bbox_to_anchor=(0.985, 0.9), #(1.26, 0.5)
                         ncol=1, title='', fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)
     elif legend and legend_pos=="single":
-        #sns.move_legend(ax, loc="center right", bbox_to_anchor=(0.97, 0.85),
-        #                ncol=1, title='', fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)
         sns.move_legend(ax, loc="upper center", bbox_to_anchor=(0.5, 1.15),  # Adjust y-position as needed
                         ncol=2, title='', fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)
 
@@ -795,7 +655,6 @@ def generate_histogram(df, window_size, title):
     plt.ylabel('Frequency')
 
     sns.move_legend(ax, loc="lower center", bbox_to_anchor=(0.5, -0.5), ncol=2, title='Exon group')
-    #plt.legend(handles=handles, labels=labels, title='Exon group', loc='upper center', bbox_to_anchor=(0.5, -0.1), shadow=True, ncol=2)
     plt.title(f"{title}: {window_size}")
     plt.show()
 
@@ -829,14 +688,7 @@ def run_pairplot_window(alu_dct, window, ks_test=False, cv=0, n_sample=0, invert
 
     concat_pairs_df = pd.concat([skippable_pairs_df, constitutive_pairs_df])
     concat_inverted_pairs_df = pd.concat([skippable_inverted_pairs_df, constitutive_inverted_pairs_df])
-    # new
     concat_noninverted_pairs_df = pd.concat([skippable_noninverted_pairs_df, constitutive_noninverted_pairs_df])
-
-    # compute lengths of Alus and exons
-    #concat_pairs_df[["upstream_alu_len", "downstream_alu_len", "exon_len"]] = (
-    #   add_alu_len_exon_len_cols(concat_pairs_df, pairs=True))
-    #concat_inverted_pairs_df[["upstream_alu_len", "downstream_alu_len", "exon_len"]] = (
-    #   add_alu_len_exon_len_cols(concat_inverted_pairs_df, pairs=True))
     
     concat_pairs_df[["upstream_alu_len", "downstream_alu_len", "exon_len", 
                      "intra_alu_len", "alu1_end_to_alu2_start", "alu2_end_to_alu1_start"]] = (
@@ -869,11 +721,6 @@ def run_pairplot_window(alu_dct, window, ks_test=False, cv=0, n_sample=0, invert
                                  n_sample=n_sample)
         return ks_res_dct
 
-    # count number of Alus in each category
-    #display(concat_pairs_df["label"].value_counts())
-    #display(concat_inverted_pairs_df["label"].value_counts())
-    #display(concat_noninverted_pairs_df["label"].value_counts())
-
     # plot
     if not inverted:
         generate_pairgrid_plot(df=concat_pairs_df,
@@ -902,11 +749,9 @@ def plot_ks_result(ks_dct, window, cv=0, n_sample=0, ax=None, show_legend=True, 
                                     for j in ks_dct[i].keys()},
                        orient='index').reset_index().rename(columns={"level_0": "feature", "level_1": "fixed_category"})
     if cv>0:
-        #num_pvalues = ks_df['pval'].apply(len).max()
         pval_columns = [f'pval{i+1}' for i in range(cv)]
         negpval_columns = [f'neglog10pval{i+1}' for i in range(cv)]
         stat_columns = [f'stat{i+1}' for i in range(cv)]
-        #ks_df[pval_columns] = pd.DataFrame(ks_df['pval'].tolist(), index=ks_df.index)
         pvals = ks_df['pval'].tolist()
         pvals_corrected = []
         for pval_list in pvals:
@@ -918,16 +763,8 @@ def plot_ks_result(ks_dct, window, cv=0, n_sample=0, ax=None, show_legend=True, 
         for pval_col in pval_columns:
             prob_temp = np.where(ks_df[pval_col] > 1.0e-10, ks_df[pval_col], 1.0e-10)
             ks_df[f"neglog10{pval_col}"] = -np.log10(prob_temp)
-        #return ks_df
         id_vars = ["feature", "fixed_category", "pval", "stat"] + stat_columns + pval_columns
         ks_df_melt = pd.melt(ks_df, id_vars=id_vars, value_vars=negpval_columns, value_name="neglog10pvals")
-        #display(ks_df_melt.groupby(["feature", "fixed_category"])["neglog10pvals"].nunique())
-
-        # category_mapping = {'skippable': 'Skippable:\nInverted vs Non-inverted', 
-        #                     'constitutive': 'Constitutive:\nInverted vs Non-inverted', 
-        #                     'inverted': 'Inverted:\nSkippable vs Constitutive', 
-        #                     'noninverted': 'Non-inverted:\nSkippable vs Constitutive', 
-        #                     'all': 'All:\nSkippable vs Constitutive'}
 
         category_mapping = {'skippable': 'Skip:\nInv vs Non-inv', 
                             'constitutive': 'Const:\nInv vs Non-inv', 
@@ -949,18 +786,7 @@ def plot_ks_result(ks_dct, window, cv=0, n_sample=0, ax=None, show_legend=True, 
                     new_parts.append(subscripted_text)
                 processed_lines.append(' vs '.join(new_parts))
             return '\n'.join(processed_lines)
-        
-        # def replace_with_subscript(text):
-        #     parts = text.split(' vs ')
-        #     new_parts = []
-        #     for part in parts:
-        #         subparts = part.split('_')
-        #         subscripted_text = f'{subparts[0]}'
-        #         for subpart in subparts[1:]:
-        #             subscripted_text += f'$_{{\mathrm{{{subpart}}}}}$'
-        #         new_parts.append(subscripted_text)
-        #     return ' vs '.join(new_parts)
-        
+                
         category_mapping_subscripts = {"skippable": replace_with_subscript("S_inv vs S_non-inv"), 
                                        "constitutive": replace_with_subscript("C_inv vs C_non-inv"),
                                        "inverted": replace_with_subscript("Inv_S vs Inv_C"),
@@ -1029,8 +855,6 @@ def plot_ks_result(ks_dct, window, cv=0, n_sample=0, ax=None, show_legend=True, 
             ax.set_ylabel("-log10(p_adj)", fontsize=fontsize_min, labelpad=axis_label_pad) #16
             handles, labels = ax.get_legend_handles_labels()
             if show_legend and ax_legend:
-                # ax_legend.legend(title='', loc='upper center', bbox_to_anchor=(0.5, 1.25), #(0.5,1.12)
-                #           ncol=2, fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min) #14
                 ax_legend.legend(handles, labels, loc='center', bbox_to_anchor=(0.5, 0.1),
                                  ncol=2, fancybox=True, shadow=False, borderaxespad=0., fontsize=fontsize_min)
                 ax_legend.axis('off')
@@ -1039,9 +863,6 @@ def plot_ks_result(ks_dct, window, cv=0, n_sample=0, ax=None, show_legend=True, 
                 ax.get_legend().remove()
             for spine in ax.spines.values():
                 spine.set_linewidth(0.25)
-            
-            #fig = ax.get_figure()
-            #fig.tight_layout(rect=[0, 0, 0.98, 0.98]) 
         
         if not ax:
             ax1.axhline(-np.log10(0.05), ls='--')
@@ -1059,7 +880,6 @@ def plot_ks_result(ks_dct, window, cv=0, n_sample=0, ax=None, show_legend=True, 
     # Convert p-values to -log10(p-values) and account for dividing by 0
     # Ref: https://stackoverflow.com/questions/21610198
     prob_temp = np.where(ks_df["pval"] > 1.0e-10, ks_df["pval"], 1.0e-10)
-    #ks_df_temp["neglog10pval"] = np.where(prob_temp > 1.0e-10, -np.log10(prob_temp), 10)
     ks_df["neglog10pval"] = -np.log10(prob_temp)
     display(ks_df)
 
