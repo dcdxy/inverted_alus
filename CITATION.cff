@@ -1,0 +1,53 @@
+cff-version: 1.2.0
+message: "If you use these notebooks or reproduce results from this repository, please cite the associated manuscript."
+title: "Analysis notebooks for: Inverted Alu repeats in loop-out exon skipping across hominoid evolution"
+type: software
+
+authors:
+  - family-names: Denisko
+    given-names: Danielle
+  - family-names: Kim
+    given-names: Jeonghyeon
+  - family-names: Ku
+    given-names: Jayoung
+
+license: "MIT"
+
+keywords:
+  - exon skipping
+  - alternative splicing
+  - transposable elements
+  - Alu
+  - inverted repeats
+  - hominoid evolution
+  - reproducible research
+  - jupyter notebooks
+
+url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC11952303/"
+
+identifiers:
+  - type: doi
+    value: 10.1101/2025.03.07.642063
+  - type: pmid
+    value: "40161837"
+  - type: pmcid
+    value: "PMC11952303"
+
+preferred-citation:
+  type: article
+  title: "Inverted Alu repeats in loop-out exon skipping across hominoid evolution"
+  authors:
+    - family-names: Denisko
+      given-names: Danielle
+    - family-names: Kim
+      given-names: Jeonghyeon
+    - family-names: Ku
+      given-names: Jayoung
+    - family-names: Zhao
+      given-names: Boxun
+    - family-names: Lee
+      given-names: Eunjung Alice
+  journal: bioRxiv
+  year: 2025
+  doi: 10.1101/2025.03.07.642063
+  url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC11952303/"
